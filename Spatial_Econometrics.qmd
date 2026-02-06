@@ -1,0 +1,47 @@
+---
+title: "TP Spatial Econometrics"
+format: html
+editor: visual
+---
+
+# TP
+
+```{r}
+setwd("/Users/martinmondelli/Desktop/Spatial Econometrics/LL2LL")
+```
+
+#Importing data
+```{r}
+library("sf")
+library("mapview")
+```
+
+```{r}
+police = read.csv("2025-07-metropolitan-outcomes.csv")
+```
+
+Counting number of NAs
+
+```{r}
+sum(is.na(police$Longitude))
+sum(is.na(police$Latitude))
+```
+
+Filtering
+
+```{r}
+police_clean <- police[!is.na(police$Longitude) & !is.na(police$Latitude),]
+```
+
+Making it sf
+
+```{r}
+my_coords <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
+```
+
+Plot it
+
+```{r}
+mapview(my_coords)
+```
+
