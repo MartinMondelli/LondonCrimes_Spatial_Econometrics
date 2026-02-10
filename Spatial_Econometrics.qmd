@@ -6,19 +6,27 @@ editor: visual
 
 # TP
 
-```{r}
-setwd("/Users/martinmondelli/Desktop/Spatial Econometrics/LL2LL")
-```
+#Importing data and packages
 
-#Importing data
 ```{r}
+# install les packages necessaires si ils ne sont pas deja installes
+if (!require(sf))      install.packages("sf")
+if (!require(mapview))      install.packages("mapview")
+
+# charge les packages
 library("sf")
 library("mapview")
+
+
+
+# chemin adaptatif vers les données 
+path_data = paste(getwd(), "2025-07-metropolitan-outcomes.csv", sep = "/")
+
+police = read.csv(path_data)
+
 ```
 
-```{r}
-police = read.csv("2025-07-metropolitan-outcomes.csv")
-```
+
 
 Counting number of NAs
 
@@ -31,6 +39,8 @@ Filtering
 
 ```{r}
 police_clean <- police[!is.na(police$Longitude) & !is.na(police$Latitude),]
+rm(police, path_data)
+gc()
 ```
 
 Making it sf
@@ -44,4 +54,41 @@ Plot it
 ```{r}
 mapview(my_coords)
 ```
+
+
+
+
+
+
+# Data base presentation 
+
+
+
+
+
+# I/ Spatial Point Patterns Introduction
+
+
+# II/ Complete Spatial Randomness
+
+
+
+# III/ The k-function
+
+
+
+# IV/ Intensity estimation
+
+
+
+# Conclusion
+
+
+
+
+
+
+
+
+
 
