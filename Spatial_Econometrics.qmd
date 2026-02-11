@@ -81,6 +81,79 @@ mapview(my_coords)
 
 
 
+```{r}
+
+my_coords2 <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
+
+
+my_coords2 = st_transform(my_coords2, crs = 27700)
+# Coordonnées
+coords2 <- st_coordinates(my_coords2)
+
+
+
+map <- ne_countries(type = "countries", country = "United Kingdom",
+                    scale = "small", returnclass = "sf")
+
+
+map <- st_transform(map, crs = "EPSG:27700")
+win <- as.owin(map)
+
+
+pp <- ppp(
+  x = coords2[,1],
+  y = coords2[,2],
+  window = win
+)
+
+
+
+
+# Plot
+plot(win, col = "lightgrey")
+plot(pp, add = TRUE, pch = 20, col = "red",size = 0.8)
+
+
+
+
+```
+
+
+```{r}
+
+lambdahat <- density(pp)
+attr(lambdahat, "sigma")
+```
+
+```{r}
+plot(lambdahat, main = "Default bandwidth")
+plot(density(X, sigma = 1))
+plot(density(X, sigma = 10))
+plot(density(X, sigma = 100))
+plot(density(X, sigma = 1000))
+plot(density(X, sigma = 10000))
+```
+
+
+
+
+```{r}
+table_var = list()
+for (i in colnames(police_clean)) {
+  table_var[[i]] = table(police_clean[i])
+}
+```
+
+```{r}
+
+table_var$Outcome.type
+
+```
+
+
+
+
+
 # Conclusion
 
 
