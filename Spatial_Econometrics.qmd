@@ -1,22 +1,66 @@
 ---
-title: "TP Spatial Econometrics"
-format: html
-editor: visual
+title: "Spatial Econometrics"
+subtitle: "Spatial Point Patterns"
+author: "Mondelli Martin, Senseby Dorian,
+ Francisco Gonzalez-Garcia, Barcaroli Clement"
+date: "`r Sys.Date()`"
+
+format:
+  html:
+    html-math-method: katex
+    theme: journal      
+    toc: true
+    toc-title: "Table of Contents"
+    toc-depth: 3
+    number-sections: false
+    code-fold: show
+    code-summary: "hide code"
+    
+
+
+
+execute:
+  warning: false
+  message: false
+
+editor:
+  visual:
+    wrap: 72
 ---
 
-# TP
+```{r setup, include=FALSE}
 
-#Importing data and packages
+if (!require(knitr))      install.packages("knitr")
+
+library(knitr)
+
+knitr::opts_chunk$set(
+  echo = TRUE,       # afficher le code par défaut
+  results = "hold",  # tous les outputs ensemble
+  fig.show = "hold", # tous les graphiques ensemble
+  warning = FALSE,
+  message = FALSE
+)
+
+```
+
+\# Importing data and packages
 
 ```{r}
 # install les packages necessaires si ils ne sont pas deja installes
 if (!require(sf))      install.packages("sf")
 if (!require(mapview))      install.packages("mapview")
+if (!require(rnaturalearth))      install.packages("rnaturalearth")
+if (!require(spatstat))      install.packages("spatstat")
+if (!require(leaflet))      install.packages("leaflet")
+
 
 # charge les packages
 library("sf")
 library("mapview")
-
+library(rnaturalearth)
+library(spatstat)
+library(leaflet)
 
 
 # chemin adaptatif vers les données 
@@ -45,12 +89,18 @@ Making it sf
 
 ```{r}
 my_coords <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
+
+
 ```
 
 Plot it
 
 ```{r}
-mapview(my_coords)
+leaflet(my_coords) %>%
+  addTiles() %>%
+  addCircleMarkers(radius = 0.1, color = "blue", fillOpacity = 0.3)
+# mapview(my_coords) 
+# mapview a été remplacé par leaflet car ça ne fonctionnait en render
 ```
 
 # Data base presentation
@@ -63,8 +113,76 @@ mapview(my_coords)
 
 # IV/ Intensity estimation
 
-<<<<<<< HEAD
+The intensity function of a spatial point process
 
+$$
+\{X_1, X_2, \dots, X_{N(A)}\}
+$$
+
+in a planar window $A \subset \mathbb{R}^2$ is defined as
+
+$$
+\lambda(x) = \lim_{|dx| \to 0} \frac{\mathbb{E}[N(dx)]}{|dx|},
+$$
+
+where $dx$ is a small region containing the point $x$.
+
+Given a stationary and isotropic spatial point process, the intensity function is constant and equal to the expected number of events per unit area:
+
+$$
+\lambda(x) = \lambda = \frac{\mathbb{E}[N(A)]}{|A|}.
+$$
+
+Thus, for an observed spatial point pattern of $n$ events observed in a region $A$, the intensity can be estimated as:
+
+$$
+\hat{\lambda} = \frac{n}{|A|}.
+$$
+
+The density and intensity functions are proportional:
+
+$$
+\lambda(x) = f(x) \int_A \lambda(u)\, du,
+$$
+
+where
+
+$$
+\int_A \lambda(u)\, du
+$$
+
+is the expected number of events in $A$.
+
+$$
+\hat{f}(x) = \frac{1}{n} \sum_{i=1}^{n} \frac{1}{h^2} 
+K\!\left( \frac{x - x_i}{h} \right).
+$$
+
+$$
+\hat{\lambda}(x) = \sum_{i=1}^{n} \frac{1}{h^2} 
+K\!\left( \frac{x - x_i}{h} \right).
+$$
+
+where $K(\cdot)$ is a symmetric function such that
+
+$$
+K(x) \ge 0 \quad \forall x
+$$
+
+and
+
+$$
+\int_A K(x)\, dx = 1,
+$$
+
+and $h$ is a smoothing parameter known as the bandwidth.
+
+One edge-correction term is defined as:
+
+$$
+p_h(x) = \int_A h^{-2} 
+K\!\left( \frac{x - u}{h} \right) du.
+$$
 
 ```{r}
 
@@ -103,24 +221,29 @@ plot(pp, add = TRUE, pch = 20, col = "red",size = 0.8)
 
 ```
 
+The smoothing kernel. A character string specifying the smoothing kernel (current options are `"gaussian"`, `"epanechnikov"`, `"quartic"` or `"disc"`), or a pixel image (object of class `"im"`) containing values of the kernel, or a `function(x,y)` which yields values of the kernel.
 
 ```{r}
-
+# kernel gaussian
 lambdahat <- density(pp)
 attr(lambdahat, "sigma")
 ```
 
+Interpretation:
+
+Sigma = bandwidth, it is in meters so a point has an influence on intensity in a zone with 76 km of diameter
+
 ```{r}
-plot(lambdahat, main = "Default bandwidth")
-plot(density(X, sigma = 1))
-plot(density(X, sigma = 10))
-plot(density(X, sigma = 100))
-plot(density(X, sigma = 1000))
-plot(density(X, sigma = 10000))
+par(mfrow = c(2,2),
+    mar = c(1,1,1,1))  # bas, gauche, haut, droite
+
+plot(density(pp, sigma = 10000))
+plot(density(pp, sigma = 20000))
+plot(density(pp, sigma = 50000))
+plot(lambdahat, main = "Default bandwidth = 76634.26")
+
+
 ```
-
-
-
 
 ```{r}
 table_var = list()
@@ -135,10 +258,4 @@ table_var$Outcome.type
 
 ```
 
-
-
-
-
-=======
->>>>>>> f753981706e8d2aacf63861165a47c2c2026d309
 # Conclusion
