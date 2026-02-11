@@ -44,7 +44,7 @@ knitr::opts_chunk$set(
 
 ```
 
-\# Importing data and packages
+Importing data and packages
 
 ```{r}
 # install les packages necessaires si ils ne sont pas deja installes
@@ -77,7 +77,7 @@ sum(is.na(police$Longitude))
 sum(is.na(police$Latitude))
 ```
 
-Filtering
+Filtering and we keep only police_clean
 
 ```{r}
 police_clean <- police[!is.na(police$Longitude) & !is.na(police$Latitude),]
@@ -88,7 +88,7 @@ gc()
 Making it sf
 
 ```{r}
-my_coords <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
+my_coords <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 27700)
 
 
 ```
@@ -113,25 +113,13 @@ leaflet(my_coords) %>%
 
 # IV/ Intensity estimation
 
-The intensity function of a spatial point process
-
-$$
-\{X_1, X_2, \dots, X_{N(A)}\}
-$$
-
-in a planar window $A \subset \mathbb{R}^2$ is defined as
+The intensity function of a spatial point process $\{X_1, X_2, \dots, X_{N(A)}\}$ in a planar window $A \subset \mathbb{R}^2$ is defined as:
 
 $$
 \lambda(x) = \lim_{|dx| \to 0} \frac{\mathbb{E}[N(dx)]}{|dx|},
 $$
 
-where $dx$ is a small region containing the point $x$.
-
-Given a stationary and isotropic spatial point process, the intensity function is constant and equal to the expected number of events per unit area:
-
-$$
-\lambda(x) = \lambda = \frac{\mathbb{E}[N(A)]}{|A|}.
-$$
+where $dx$ is a small region containing the point $x$. Under stationary, the distribution of the process is invariant under spatial translations, and under isotropic it is invariant under rotations; therefore, the expected number of events per unit area does not depend on the location $x$, implying that the intensity is constant and equal to $\lambda(x) = \lambda = \frac{\mathbb{E}[N(A)]}{|A|}$.
 
 Thus, for an observed spatial point pattern of $n$ events observed in a region $A$, the intensity can be estimated as:
 
@@ -145,13 +133,7 @@ $$
 \lambda(x) = f(x) \int_A \lambda(u)\, du,
 $$
 
-where
-
-$$
-\int_A \lambda(u)\, du
-$$
-
-is the expected number of events in $A$.
+where $\int_A \lambda(u)\, du$ is the expected number of events in $A$. So the intensity is equal to the probability to observe an event at location $x$ multiply by the expected number of event in $A$
 
 $$
 \hat{f}(x) = \frac{1}{n} \sum_{i=1}^{n} \frac{1}{h^2} 
@@ -163,25 +145,41 @@ $$
 K\!\left( \frac{x - x_i}{h} \right).
 $$
 
-where $K(\cdot)$ is a symmetric function such that
+where $K(\cdot)$ is a symmetric function such that $K(x) \ge 0 \quad \forall x$ and $\int_A K(x)\, dx = 1,$ and $h$ is a smoothing parameter known as the bandwidth.
+
+where $K(\cdot)$ is a symmetric function such that $K(x) \ge 0 \quad \forall x$ and $\int_{\mathbb{R}^2} K(u)\, du = 1$.
+
+If a Gaussian kernel is used in two dimensions, then
 
 $$
-K(x) \ge 0 \quad \forall x
+K(u) = \frac{1}{2\pi} 
+\exp\left(-\frac{1}{2} u^\top u \right),
+\quad u \in \mathbb{R}^2,
 $$
 
-and
-
-$$
-\int_A K(x)\, dx = 1,
-$$
-
-and $h$ is a smoothing parameter known as the bandwidth.
+where $u^\top u = \|u\|^2 = u_1^2 + u_2^2$.
 
 One edge-correction term is defined as:
 
 $$
 p_h(x) = \int_A h^{-2} 
-K\!\left( \frac{x - u}{h} \right) du.
+K\!\left( \frac{x - u}{h} \right) du
+$$
+
+
+$p_h(x)$ represents the proportion of the kernel centered at $x$ that lies within the study region $A$ to correct the negative bias that occurs near the boundaries.
+
+
+$$ 
+\longrightarrow \hat{f}(x) = \frac{1}{n p_h(x)}  \sum_{i=1}^{n} \frac{1}{h^2} 
+K\!\left( \frac{x - x_i}{h} \right)
+$$
+
+and
+
+$$
+\longrightarrow \hat{\lambda}(x) = \frac{1}{p_h(x)}  \sum_{i=1}^{n} \frac{1}{h^2} 
+K\!\left( \frac{x - x_i}{h} \right)
 $$
 
 ```{r}
@@ -210,18 +208,24 @@ pp <- ppp(
 )
 
 
+par(mfrow = c(1,1),
+    mar = c(1,1,1,1))  # bas, gauche, haut, droite
 
 
 # Plot
-plot(win, col = "lightgrey")
-plot(pp, add = TRUE, pch = 20, col = "red",size = 0.8)
+plot(win, col = "lightgrey", main = "Spatial Point Pattern of Police Outcomes in the UK")
+plot(pp, add = TRUE, pch = 20, col = "blue",size = 0.8)
 
 
 
 
 ```
 
-The smoothing kernel. A character string specifying the smoothing kernel (current options are `"gaussian"`, `"epanechnikov"`, `"quartic"` or `"disc"`), or a pixel image (object of class `"im"`) containing values of the kernel, or a `function(x,y)` which yields values of the kernel.
+## Intensity estimation
+
+Possible kernels are : gaussian, epanechnikov, quartic, disc or a personalized function
+
+Estimation with the default bandwidth and gaussian kernel:
 
 ```{r}
 # kernel gaussian
@@ -235,12 +239,26 @@ Sigma = bandwidth, it is in meters so a point has an influence on intensity in a
 
 ```{r}
 par(mfrow = c(2,2),
-    mar = c(1,1,1,1))  # bas, gauche, haut, droite
+    mar = c(1,1,1,1),      # marges internes des graphiques
+    oma = c(0,0,2,0))      # marges externes (haut = 4)
 
-plot(density(pp, sigma = 10000))
-plot(density(pp, sigma = 20000))
-plot(density(pp, sigma = 50000))
-plot(lambdahat, main = "Default bandwidth = 76634.26")
+plot(density(pp, sigma = 10000),
+     main = "Bandwidth = 10000")
+
+plot(density(pp, sigma = 20000),
+     main = "Bandwidth = 20000")
+
+plot(density(pp, sigma = 50000),
+     main = "Bandwidth = 50000")
+
+plot(density(pp),
+     main = "Default Bandwidth = 76634.26")
+
+# Titre global
+mtext("Intensity estimation with different bandwidths",
+      outer = TRUE,
+      cex = 1.5,
+      font = 2)
 
 
 ```
