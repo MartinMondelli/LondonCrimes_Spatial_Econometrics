@@ -135,8 +135,110 @@ table_var$Outcome.type
 
 ```
 
+We want to test whether points are distributed uniformly on A or not.
+
+```{r}
+X <- as.ppp(st_coordinates(my_coords), st_bbox(my_coords)) #Turn sf into ppp
+```
+
+```{r}
 
 
+Q <- quadratcount(X, nx = 100, ny = 120) #Transform ppp into a nx*ny grid. As England is elongated, we use an elongated grid
+
+quadrat.test(Q) #p-value < 0.001 ==> there is a pattern of distribution
+quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a regular pattern
+quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
+
+```
+
+```{r}
+Q <- quadratcount(X, nx = 2, ny = 2) #Transform ppp into a nx*ny grid. As England is elongated, we use an elongated grid
+
+quadrat.test(Q) #p-value < 0.001 ==> there is a pattern of distribution
+quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a regular pattern
+quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
+```
+
+```{r}
+Q <- quadratcount(X, nx = 1000, ny = 1000) #Transform ppp into a nx*ny grid. As England is elongated, we use an elongated grid
+
+quadrat.test(Q) #p-value < 0.001 ==> there is a pattern of distribution
+quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a regular pattern
+quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
+```
+
+No matter the grid, it seems that London has too much points clustered
+
+Let's restrict our scope to greater London:
+
+```{r}
+library(spatstat.geom)
+
+# Définition d'une bbox autour de Londres (WGS84)
+london_bbox <- st_bbox(c(
+  xmin = -0.6,
+  xmax =  0.3,
+  ymin = 51.3,
+  ymax = 51.7
+), crs = st_crs(4326))
+
+# Transformation en sfc
+london_window <- st_as_sfc(london_bbox)
+
+# Restriction aux points dans la bbox
+my_coords_london <- my_coords[london_window, ]
+
+# Conversion en ppp
+X <- as.ppp(
+  st_coordinates(my_coords_london),
+  W = as.owin(london_bbox)
+)
+
+X
+```
+
+```{r}
+Q <- quadratcount(X, nx = 10, ny = 10) #Transform ppp into a nx*ny grid. As England is elongated, we use an elongated grid
+
+quadrat.test(Q) #p-value < 0.001 ==> there is a pattern of distribution
+quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a regular pattern
+quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
+```
+
+```{r}
+
+my_coords <- st_transform(my_coords, 27700)
+
+london_bbox <- st_bbox(c(
+  xmin = 528000,
+  xmax = 552000,
+  ymin = 170000,
+  ymax = 200000
+), crs = st_crs(27700))
+
+london_window <- st_as_sfc(london_bbox)
+
+my_coords_london <- my_coords[london_window, ]
+
+W <- as.owin(london_bbox)
+
+X <- as.ppp(
+  X = st_coordinates(my_coords_london),
+  W = W
+)
+
+
+plot(W)
+plot(X, add = TRUE, pch = 20)
+```
+```{r}
+Q <- quadratcount(X, nx = 100, ny = 100) #Transform ppp into a nx*ny grid. As England is elongated, we use an elongated grid
+
+quadrat.test(Q) #p-value < 0.001 ==> there is a pattern of distribution
+quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a regular pattern
+quadrat.test(Q, alternative = "clustered")
+```
 
 
 =======
