@@ -26,8 +26,6 @@ police = read.csv(path_data)
 
 ```
 
-
-
 Counting number of NAs
 
 ```{r}
@@ -55,40 +53,14 @@ Plot it
 mapview(my_coords)
 ```
 
-
-
-
-
-
-# Data base presentation 
-
-
-
-
+# Data base presentation
 
 # I/ Spatial Point Patterns Introduction
 
-
 # II/ Complete Spatial Randomness
-
-
 
 # III/ The k-function
 
-
-
 # IV/ Intensity estimation
 
-
-
 # Conclusion
-
-
-
-
-
-
-
-
-
-
