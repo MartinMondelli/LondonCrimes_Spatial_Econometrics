@@ -1,22 +1,66 @@
 ---
-title: "TP Spatial Econometrics"
-format: html
-editor: visual
+title: "Spatial Econometrics"
+subtitle: "Spatial Point Patterns"
+author: "Mondelli Martin, Senseby Dorian,
+ Francisco Gonzalez-Garcia, Barcaroli Clement"
+date: "`r Sys.Date()`"
+
+format:
+  html:
+    html-math-method: katex
+    theme: journal      
+    toc: true
+    toc-title: "Table of Contents"
+    toc-depth: 3
+    number-sections: false
+    code-fold: show
+    code-summary: "hide code"
+    
+
+
+
+execute:
+  warning: false
+  message: false
+
+editor:
+  visual:
+    wrap: 72
 ---
 
-# TP
+```{r setup, include=FALSE}
 
-#Importing data and packages
+if (!require(knitr))      install.packages("knitr")
+
+library(knitr)
+
+knitr::opts_chunk$set(
+  echo = TRUE,       # afficher le code par défaut
+  results = "hold",  # tous les outputs ensemble
+  fig.show = "hold", # tous les graphiques ensemble
+  warning = FALSE,
+  message = FALSE
+)
+
+```
+
+Importing data and packages
 
 ```{r}
 # install les packages necessaires si ils ne sont pas deja installes
 if (!require(sf))      install.packages("sf")
 if (!require(mapview))      install.packages("mapview")
+if (!require(rnaturalearth))      install.packages("rnaturalearth")
+if (!require(spatstat))      install.packages("spatstat")
+if (!require(leaflet))      install.packages("leaflet")
+
 
 # charge les packages
 library("sf")
 library("mapview")
-
+library(rnaturalearth)
+library(spatstat)
+library(leaflet)
 
 
 # chemin adaptatif vers les données 
@@ -33,7 +77,7 @@ sum(is.na(police$Longitude))
 sum(is.na(police$Latitude))
 ```
 
-Filtering
+Filtering and we keep only police_clean
 
 ```{r}
 police_clean <- police[!is.na(police$Longitude) & !is.na(police$Latitude),]
@@ -102,7 +146,74 @@ Remark: one limitation, as we could see on the map above is that the points are 
 
 # IV/ Intensity estimation
 
-\<\<\<\<\<\<\< HEAD
+The intensity function of a spatial point process $\{X_1, X_2, \dots, X_{N(A)}\}$ in a planar window $A \subset \mathbb{R}^2$ is defined as:
+
+$$
+\lambda(x) = \lim_{|dx| \to 0} \frac{\mathbb{E}[N(dx)]}{|dx|},
+$$
+
+where $dx$ is a small region containing the point $x$. Under stationary, the distribution of the process is invariant under spatial translations, and under isotropic it is invariant under rotations; therefore, the expected number of events per unit area does not depend on the location $x$, implying that the intensity is constant and equal to $\lambda(x) = \lambda = \frac{\mathbb{E}[N(A)]}{|A|}$.
+
+Thus, for an observed spatial point pattern of $n$ events observed in a region $A$, the intensity can be estimated as:
+
+$$
+\hat{\lambda} = \frac{n}{|A|}.
+$$
+
+The density and intensity functions are proportional:
+
+$$
+\lambda(x) = f(x) \int_A \lambda(u)\, du,
+$$
+
+where $\int_A \lambda(u)\, du$ is the expected number of events in $A$. So the intensity is equal to the probability to observe an event at location $x$ multiply by the expected number of event in $A$
+
+$$
+\hat{f}(x) = \frac{1}{n} \sum_{i=1}^{n} \frac{1}{h^2} 
+K\!\left( \frac{x - x_i}{h} \right).
+$$
+
+$$
+\hat{\lambda}(x) = \sum_{i=1}^{n} \frac{1}{h^2} 
+K\!\left( \frac{x - x_i}{h} \right).
+$$
+
+where $K(\cdot)$ is a symmetric function such that $K(x) \ge 0 \quad \forall x$ and $\int_A K(x)\, dx = 1,$ and $h$ is a smoothing parameter known as the bandwidth.
+
+where $K(\cdot)$ is a symmetric function such that $K(x) \ge 0 \quad \forall x$ and $\int_{\mathbb{R}^2} K(u)\, du = 1$.
+
+If a Gaussian kernel is used in two dimensions, then
+
+$$
+K(u) = \frac{1}{2\pi} 
+\exp\left(-\frac{1}{2} u^\top u \right),
+\quad u \in \mathbb{R}^2,
+$$
+
+where $u^\top u = \|u\|^2 = u_1^2 + u_2^2$.
+
+One edge-correction term is defined as:
+
+$$
+p_h(x) = \int_A h^{-2} 
+K\!\left( \frac{x - u}{h} \right) du
+$$
+
+
+$p_h(x)$ represents the proportion of the kernel centered at $x$ that lies within the study region $A$ to correct the negative bias that occurs near the boundaries.
+
+
+$$ 
+\longrightarrow \hat{f}(x) = \frac{1}{n p_h(x)}  \sum_{i=1}^{n} \frac{1}{h^2} 
+K\!\left( \frac{x - x_i}{h} \right)
+$$
+
+and
+
+$$
+\longrightarrow \hat{\lambda}(x) = \frac{1}{p_h(x)}  \sum_{i=1}^{n} \frac{1}{h^2} 
+K\!\left( \frac{x - x_i}{h} \right)
+$$
 
 ```{r}
 
@@ -130,30 +241,59 @@ pp <- ppp(
 )
 
 
+par(mfrow = c(1,1),
+    mar = c(1,1,1,1))  # bas, gauche, haut, droite
 
 
 # Plot
-plot(win, col = "lightgrey")
-plot(pp, add = TRUE, pch = 20, col = "red",size = 0.8)
+plot(win, col = "lightgrey", main = "Spatial Point Pattern of Police Outcomes in the UK")
+plot(pp, add = TRUE, pch = 20, col = "blue",size = 0.8)
 
 
 
 
 ```
 
-```{r}
+## Intensity estimation
 
+Possible kernels are : gaussian, epanechnikov, quartic, disc or a personalized function
+
+Estimation with the default bandwidth and gaussian kernel:
+
+```{r}
+# kernel gaussian
 lambdahat <- density(pp)
 attr(lambdahat, "sigma")
 ```
 
+Interpretation:
+
+Sigma = bandwidth, it is in meters so a point has an influence on intensity in a zone with 76 km of diameter
+
 ```{r}
-plot(lambdahat, main = "Default bandwidth")
-plot(density(X, sigma = 1))
-plot(density(X, sigma = 10))
-plot(density(X, sigma = 100))
-plot(density(X, sigma = 1000))
-plot(density(X, sigma = 10000))
+par(mfrow = c(2,2),
+    mar = c(1,1,1,1),      # marges internes des graphiques
+    oma = c(0,0,2,0))      # marges externes (haut = 4)
+
+plot(density(pp, sigma = 10000),
+     main = "Bandwidth = 10000")
+
+plot(density(pp, sigma = 20000),
+     main = "Bandwidth = 20000")
+
+plot(density(pp, sigma = 50000),
+     main = "Bandwidth = 50000")
+
+plot(density(pp),
+     main = "Default Bandwidth = 76634.26")
+
+# Titre global
+mtext("Intensity estimation with different bandwidths",
+      outer = TRUE,
+      cex = 1.5,
+      font = 2)
+
+
 ```
 
 ```{r}
@@ -169,4 +309,4 @@ table_var$Outcome.type
 
 ```
 
-======= \>\>\>\>\>\>\> f753981706e8d2aacf63861165a47c2c2026d309 \# Conclusion
+# Conclusion
