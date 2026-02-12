@@ -88,19 +88,24 @@ gc()
 Making it sf
 
 ```{r}
-my_coords <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 27700)
-
-
+my_coords <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
+my_coords <- st_transform(my_coords, 27700)
 ```
 
 Plot it
 
 ```{r}
-leaflet(my_coords) %>%
-  addTiles() %>%
-  addCircleMarkers(radius = 0.1, color = "blue", fillOpacity = 0.3)
-# mapview(my_coords) 
-# mapview a été remplacé par leaflet car ça ne fonctionnait en render
+mapview(my_coords) #If it doesn't work try with leaflet
+```
+
+```{r}
+coords <- st_coordinates(my_coords)
+win <- as.owin(st_bbox(my_coords))
+police_clean_ppp <- ppp(
+  x = coords[,1],
+  y = coords[,2],
+  window = win
+)
 ```
 
 # Data base presentation
@@ -110,6 +115,34 @@ leaflet(my_coords) %>%
 # II/ Complete Spatial Randomness
 
 # III/ The k-function
+
+```{r}
+K <- Kest(
+  police_clean_ppp,
+  correction = c("border", "Ripley", "isotropic", "translate")
+)
+plot(K)
+```
+
+The function K is giving us the mean of all possible circles of size r for each r between 0 and 25 km.
+
+```{r}
+L <- Lest(police_clean_ppp,
+          correction = c("border", "Ripley", "isotropic", "translate")
+)
+plot(L)
+```
+
+We observe the same for the L-function.
+
+```{r}
+E <- envelope(police_clean_ppp, Kest, nsim = 99)
+plot(E)
+```
+
+Clearly the pattern is not random as the poisson distribution is clearly lower than the empirical K. The estimators (with the different corrections) are quite high meaning that the point pattern is clearly not random. For small radius we observe that the clustering is already important but it clearly explodes after 5 km.
+
+Remark: one limitation, as we could see on the map above is that the points are quite centered in London and surroundings meaning that our estimation is driven mainly by this area.
 
 # IV/ Intensity estimation
 
