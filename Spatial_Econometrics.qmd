@@ -114,37 +114,7 @@ police_clean_ppp <- ppp(
 
 # II/ Complete Spatial Randomness
 
-# III/ The k-function
-
-```{r}
-K <- Kest(
-  police_clean_ppp,
-  correction = c("border", "Ripley", "isotropic", "translate")
-)
-plot(K)
-```
-
-The function K is giving us the mean of all possible circles of size r for each r between 0 and 25 km.
-
-```{r}
-L <- Lest(police_clean_ppp,
-          correction = c("border", "Ripley", "isotropic", "translate")
-)
-plot(L)
-```
-
-We observe the same for the L-function.
-
-```{r}
-E <- envelope(police_clean_ppp, Kest, nsim = 99)
-plot(E)
-```
-
-Clearly the pattern is not random as the poisson distribution is clearly lower than the empirical K. The estimators (with the different corrections) are quite high meaning that the point pattern is clearly not random. For small radius we observe that the clustering is already important but it clearly explodes after 5 km.
-
-Remark: one limitation, as we could see on the map above is that the points are quite centered in London and surroundings meaning that our estimation is driven mainly by this area.
-
-# IV/ Intensity estimation
+# III/ Intensity estimation
 
 The intensity function of a spatial point process $\{X_1, X_2, \dots, X_{N(A)}\}$ in a planar window $A \subset \mathbb{R}^2$ is defined as:
 
@@ -308,5 +278,109 @@ for (i in colnames(police_clean)) {
 table_var$Outcome.type
 
 ```
+
+# IV/ The k-function
+
+The K-function is defined as :
+
+$$
+K(s) = \frac{E(\text{number of n events within distance s of event i})}{\lambda}
+$$
+Where $\lambda$ is the intensity function. As mentioned before, it is defined, in the case of CSR as:
+
+$$
+\lambda = \frac{E(N(A))}{|A|}
+$$
+Where N(A) is the number of points in A and $|A|$ is the area of A. 
+
+We can also rewrite the "number of n events within distance s of event i" as the number of points within a circle C of radius s and center i or more concise within region A: "number of points in C". Then, we can rewrite the K-function as:
+
+$$
+K(s) = \frac{E(\text{number of points in C})\times\frac{|C|}{|C|}}{\frac{E(\text{number of points in C)} }{|C|}}
+$$
+Which simplifies to : $K(s) = |C|=\pi\times s^2$.
+
+As we mentioned before, CSR is our benchmark: this scenario means that all points are distributed randomly and there is no clustering or regular patterns. Meaning that points are neither too close or too separated. This interpretation is due to the fact that if we had a clustering situation while we suppose CSR, then it would be highly likely that there will be more points than expected under CSR close to a certain event i, thus driving the expectation in the numerator above the CSR scenario. In the case of regular pattern, we would have the opposite situation, there would be points that are quite separeted driving the number of expected points arround a certain event i down and thus decreasing K.   
+
+Before going to the application, let's define the estimator function of K when we do not assume CSR:
+
+$$
+\hat{K}(s) = \frac{\hat{E}(s)}{\hat{\lambda}}
+$$
+Where:
+$$
+\hat{E}(s)=\frac{1}{n}\sum_{i=1}^n\sum_{i \neq j}^{n-1}w_{ij}I(d_{ij}\le s)
+$$
+and $\hat{\lambda}$ the estimator of the intensity function as defined before.
+
+This estimator is a quite forward estimation, in fact for the numerator we just count the number of points we actually see in the circle C for all possible points and we then take the mean to retrieve the average number of points in the circle C when we take different centroids. This gives us a clear idea of the number of neighboring events for each point on average. For the denominator, we just take the usual estimator for the intensity function as we saw before. 
+
+About the weights, we need them because there are certain events that cannot be considered as the others. For example, if we consider an event i that is at border of A, if we do not take into consideration the fact that a part of the circle C is located outside the region and thus has 0 probability of containing other events, we would have a negative bias for these points. Another reason to consider this weights is because: we might be considering a circle C that is too small or too large: in fact if we take a circle so small that cannot contain any other event, then we would have a negative bias. Inversely, if the circle is too big, we might be considering as neighbors events that are too far apart, thus producing a positive bias.
+
+The weights we can apply in the package spatstat are:
+
+- The border correction (Ripley 1988): $w_{ij}=1$ if C fits A, else it is equal to 0 (Ripley, 1988)
+
+- The isotropic correction (Ohser 1983, Ripley 1988): $w_{ij} = \frac{\text{Total area of C}}{\text{Are of C in A}}$
+
+-The translate correction (Ohser 1983): 
+$$
+w_{ij} = \frac{|A|}{|A \cap (A+(x_i-x_j))|}
+$$
+It exist also the possibility to compute $\hat{K}(s)$ without $w_{i,j}$.
+
+```{r}
+K <- Kest(
+  police_clean_ppp,
+  correction = c("border", "Ripley", "isotropic", "translate")
+)
+plot(K)
+```
+
+The function K is giving us the mean of all possible circles of size r for each r between 0 and 25 km. We clearly see that we are above the benchmark of the theoretical K (when we apply CSR) whatoever the weights, then we can conclude that points are clearly clustered.
+
+##The L-function
+
+A variant of the $\hat{K}(s)$ function is the $\hat{L}(s)$ that is the square root of the first one divided by square root of $\pi$. This variant allows to interpret better the measure of the K-function and gives us better visualizations.
+
+$$
+L(s) = \sqrt{\frac{K(s)}{\pi}}
+$$
+and 
+$$
+\hat{L}(s) = \sqrt{\frac{\hat{K}(s)}{\pi}}
+
+$$
+
+```{r}
+L <- Lest(police_clean_ppp,
+          correction = c("border", "Ripley", "isotropic", "translate")
+)
+plot(L)
+```
+
+We have the same interpretations for the L-function.
+
+##The K-function and Monte Carlo
+
+It is also possible to test for CSR using the K function and a Monte Carlo approximation:
+
+- Compute the $\hat{K}(s)$ of the real data.
+- Generate M number of spatial point patterns over A using homogeneous Poisson process (CSR).
+- Estimate $\hat{K}(s)$ and take the confidence interval of size 95\%.
+- Reject CSR if the real estimation is outside of the CI.
+
+This procedures gives us a more significant measure to test for CSR. In fact, it allows us (or not) to reject at confidence level 95% the precense of CSR.
+
+```{r}
+E <- envelope(police_clean_ppp, Kest, nsim = 99)
+plot(E)
+```
+
+##Conclusion
+Clearly the pattern is not random as the poisson distribution is clearly lower than the empirical K. The estimators (with the different corrections) are quite high meaning that the point pattern is clearly not random. For small radius we observe that the clustering is already important but it clearly explodes after 5 km.
+
+Remark: one limitation, as we could see on the map above is that the points are quite centered in London and surroundings meaning that our estimation is driven mainly by this area.
+
 
 # Conclusion
