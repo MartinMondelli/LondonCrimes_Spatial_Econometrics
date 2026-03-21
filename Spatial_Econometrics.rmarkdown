@@ -44,7 +44,9 @@ knitr::opts_chunk$set(
 
 ```
 
+
 Importing data and packages
+
 
 ```{r}
 # install les packages necessaires si ils ne sont pas deja installes
@@ -70,14 +72,18 @@ police = read.csv(path_data)
 
 ```
 
+
 Counting number of NAs
+
 
 ```{r}
 sum(is.na(police$Longitude))
 sum(is.na(police$Latitude))
 ```
 
+
 Filtering and we keep only police_clean
+
 
 ```{r}
 police_clean <- police[!is.na(police$Longitude) & !is.na(police$Latitude),]
@@ -85,14 +91,18 @@ rm(police, path_data)
 gc()
 ```
 
+
 Making it sf
+
 
 ```{r}
 my_coords <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
 my_coords <- st_transform(my_coords, 27700)
 ```
 
+
 Plot it
+
 
 ```{r}
 mapview(my_coords) #If it doesn't work try with leaflet
@@ -108,6 +118,7 @@ police_clean_ppp <- ppp(
 )
 ```
 
+
 # Data base presentation
 
 # I/ Spatial Point Patterns Introduction
@@ -115,6 +126,7 @@ police_clean_ppp <- ppp(
 # II/ Complete Spatial Randomness
 
 # III/ The k-function
+
 
 ```{r}
 K <- Kest(
@@ -124,7 +136,9 @@ K <- Kest(
 plot(K)
 ```
 
+
 The function K is giving us the mean of all possible circles of size r for each r between 0 and 25 km.
+
 
 ```{r}
 L <- Lest(police_clean_ppp,
@@ -133,12 +147,15 @@ L <- Lest(police_clean_ppp,
 plot(L)
 ```
 
+
 We observe the same for the L-function.
+
 
 ```{r}
 E <- envelope(police_clean_ppp, Kest, nsim = 99)
 plot(E)
 ```
+
 
 Clearly the pattern is not random as the poisson distribution is clearly lower than the empirical K. The estimators (with the different corrections) are quite high meaning that the point pattern is clearly not random. For small radius we observe that the clustering is already important but it clearly explodes after 5 km.
 
@@ -223,6 +240,7 @@ $$
 
 
 
+
 ```{r}
 
 my_coords2 <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
@@ -262,11 +280,13 @@ plot(pp, add = TRUE, pch = 20, col = "blue",size = 0.8)
 
 ```
 
+
 ## Intensity estimation in practice
 
 Possible kernels are : gaussian, epanechnikov, quartic, disc or a personalized function
 
 Estimation with the default bandwidth and gaussian kernel:
+
 
 ```{r}
 # kernel gaussian
@@ -274,9 +294,11 @@ lambdahat <- density(pp)
 attr(lambdahat, "sigma")
 ```
 
+
 Interpretation:
 
 Sigma = bandwidth, it is in meters so a point has an influence on intensity in a zone with 76 km of diameter
+
 
 ```{r}
 par(mfrow = c(2,2),
@@ -317,4 +339,6 @@ table_var$Outcome.type
 
 ```
 
+
 # Conclusion
+
