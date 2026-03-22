@@ -486,7 +486,7 @@ leaflet(LSOA_in_window) %>%
     fill = FALSE,
     color = "black",
     weight = 2
-  ) |> setView( lng = -0.1000, lat = 51.51, zoom = 10)
+  ) 
 
 
 
