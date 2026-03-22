@@ -434,8 +434,8 @@ leaflet() %>%
 ```
 
 ### Import of population table (variable aggregated at LSOA level)
-LSOA = geographic unit used by ONS (organism national statistics) of UK
 
+LSOA = geographic unit used by ONS (organism national statistics) of UK
 
 source: [United kingdom government: population estimate by LSOA](https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates)
 
@@ -446,7 +446,6 @@ religion table:
 migrant table : <https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/adhocs/2209populationcountsofmigrantstatusbyethnicgroupacrosslowerlayersuperoutputareaenglandandwalescensus2021>
 
 LSOA table : <https://geoportal.statistics.gov.uk/datasets/0f80c523f3cd4d0fab5111572f84a2fb_0/explore>
-
 
 ```{r}
 # all geographic unit from UK
@@ -469,9 +468,8 @@ LSOA_in_window <- LSOA_uk[lengths(index) > 0, ]
 
 ```
 
-
-
 Plot of all geographic unit
+
 ```{r}
 
 leaflet(LSOA_in_window) %>%
@@ -492,8 +490,6 @@ leaflet(LSOA_in_window) %>%
 
 ```
 
-
-
 ```{r}
 
 population <- read_excel("population.xlsx", 
@@ -501,8 +497,6 @@ population <- read_excel("population.xlsx",
 population = population[,1:5]
 
 ```
-
-
 
 ```{r}
 
@@ -515,7 +509,6 @@ pop_london = LSOA_in_window |> left_join(population, by = c("LSOA01CD" = "LSOA 2
 sum(is.na(pop_london$Total))
 
 ```
-
 
 ```{r}
 table_var = list()
@@ -622,5 +615,228 @@ plot(E)
 ##Conclusion Clearly the pattern is not random as the poisson distribution is clearly lower than the empirical K. The estimators (with the different corrections) are quite high meaning that the point pattern is clearly not random. For small radius we observe that the clustering is already important but it clearly explodes after 5 km.
 
 Remark: one limitation, as we could see on the map above is that the points are quite centered in London and surroundings meaning that our estimation is driven mainly by this area.
+
+# V/ Regression
+
+We will do regression using the dataset from this website: <https://www.ons.gov.uk/economy/grossdomesticproductgdp/datasets/regionalgrossdomesticproductlocalauthorities?utm_source=chatgpt.com> It contains diverse indicators on areas in the United Kingdom, it was published in December 2019.
+
+First we need to import the shapes of the districts in the UK
+
+```{r}
+library(sf)
+areas <- st_read("Shape/Local_Authority_Districts_December_2019_GCB_UK.shp")
+```
+
+```{r}
+areas |>
+  dplyr::select(lad19cd, lad19nm) |>
+  head() #It works
+```
+
+We will use two variables:
+
+-   Total resident population numbers
+
+-   Gross domestic product per head at current market prices
+
+## For resident population numbers
+
+```{r}
+if (!require(readxl))      install.packages("readxl")
+library("readxl")
+library(raster)
+library(spatstat.geom)
+library(sp)
+
+number_residents <- read_excel(
+  path_data,
+  sheet = "Table 6",
+  skip = 1
+)
+```
+
+Renaming so that population and shapes coincide
+
+```{r}
+areas <- areas |> dplyr::rename( 
+  area_code = "lad19cd", 
+  area_name = "lad19nm" 
+  )
+
+number_residents <- number_residents |> dplyr::rename( 
+  area_code = "LA code", 
+  area_name = "LA name" 
+  )
+
+areas <- areas |>
+  dplyr::left_join(number_residents, by = "area_code")
+
+areas_vect <- as(areas, "Spatial")
+```
+
+Plot it
+
+```{r}
+plot(areas["2018"])
+```
+
+London area population/crimes:
+
+```{r}
+london_area <- areas[areas$`NUTS1 Region` == 'London', ]
+london_crimes <- my_coords[grepl("^E0100", my_coords$LSOA.code), ]
+mapview(london_area["2018"]) +
+  mapview(london_crimes, col.regions = "red", alpha = 0.2, cex = 0.5)
+```
+
+It seems that there is no major link between the crimes commited and the number of residents in an area. We will try regression anyways.
+
+Proceed to regression
+
+```{r}
+#A raster is a database organized as a rectangular grid that is sub-divided into rectangular cells of equal area (in terms of the units of the coordinate reference system)
+r_template <- raster(extent(areas_vect))  #we use extent to get the same size as the number of points in the police dataset
+population_raster <- rasterize(
+  areas_vect,          #Our polygones
+  r_template,          #Raster base where they will be put
+  field = "X2018",     #Population in 2018
+  fun = mean,          #Take mean if various polygones are in the same area
+  background = NA      #NA for cases without any value
+)
+
+#Transform ppp into spatial points
+points_sp <- SpatialPoints(cbind(police_clean_ppp$x, police_clean_ppp$y),
+                           proj4string = crs(population_raster))
+
+#Extract population values for each point
+police_clean_ppp$number_residents <- raster::extract(population_raster, points_sp)
+
+#Only keep points where the value of population is not NA
+police_clean_ppp_filtered <- police_clean_ppp[!is.na(police_clean_ppp$number_residents)]
+population_raster[is.na(population_raster)] <- 0 #To double check (give them value 0)
+library(spatstat.geom)
+
+#Convert to im so that we can use it in ppm
+mat <- as.matrix(population_raster)
+ext <- extent(population_raster)
+number_residents_im <- im(
+  mat,
+  xcol = seq(ext@xmin, ext@xmax, length.out = ncol(mat)),
+  yrow = seq(ext@ymin, ext@ymax, length.out = nrow(mat))
+) 
+```
+
+Result
+
+```{r}
+ppm_model <- ppm(
+  police_clean_ppp ~ number_residents,
+  covariates = list(number_residents = number_residents_im)
+)
+summary(ppm_model)
+```
+
+Notes:
+
+-   Edge correction "border"
+
+-   82075 points
+
+-   Average intensity: 4.51e-07
+
+-   Area of the window: 1.81916e+11 square units
+
+-   Dummy points: fictive points used to approximate integral
+
+-   Intercept: -14.41 in logs (base log-intensity)
+
+-   When we increase by one unit the population, the log intensity deacreases by -9.91e-05 or alternatively, when we increase by 1 unit population, intensity is multiplied by 0.9999.
+
+What is probably happening is that the number of inhabitants in a region might not explain by itself the number of crimes, it is probably a problem of IV.
+
+## For product per head
+
+```{r}
+product_head <- read_excel(
+  path_data,
+  sheet = "Table 7",
+  skip = 1
+)
+
+areas <- areas |> dplyr::rename( 
+  area_code = "lad19cd", 
+  area_name = "lad19nm" 
+  )
+
+product_head <- product_head |> dplyr::rename( 
+  area_code = "LA code", 
+  area_name = "LA name" 
+  )
+
+areas <- areas |>
+  dplyr::left_join(product_head, by = "area_code")
+
+areas_vect <- as(areas, "Spatial")
+
+plot(areas["20183"])
+```
+
+```{r}
+london_area <- areas[areas$`NUTS1 Region` == 'London', ]
+london_area <- london_area %>%
+    dplyr::filter(!(area_code %in% c("E09000001", "E09000007"))) #Take out observations with +1M GDP/head : City of London and Camdem
+london_crimes <- my_coords[grepl("^E0100", my_coords$LSOA.code), ]
+mapview(london_area["20183"]) +
+  mapview(london_crimes, col.regions = "red", alpha = 0.2, cex = 0.5)
+```
+
+```{r}
+#A raster is a database organized as a rectangular grid that is sub-divided into rectangular cells of equal area (in terms of the units of the coordinate reference system)
+r_template <- raster(extent(areas_vect))  #we use extent to get the same size as the number of points in the police dataset
+gdphead_raster <- rasterize(
+  areas_vect,          #Our polygones
+  r_template,          #Raster base where they will be put
+  field = "X20183",     #GDP/head in 2018
+  fun = mean,          #Take mean if various polygones are in the same area
+  background = NA      #NA for cases without any value
+)
+
+#Transform ppp into spatial points
+points_sp <- SpatialPoints(cbind(police_clean_ppp$x, police_clean_ppp$y),
+                           proj4string = crs(population_raster))
+
+#Extract GDP/head values for each point
+police_clean_ppp$gdp_hab <- raster::extract(population_raster, points_sp)
+
+#Only keep points where the value of GDP/head is not NA
+police_clean_ppp_filtered <- police_clean_ppp[!is.na(police_clean_ppp$gdp_hab)]
+gdphead_raster[is.na(gdphead_raster)] <- 0 #To double check (give them value 0)
+library(spatstat.geom)
+
+#Convert to im so that we can use it in ppm
+mat <- as.matrix(gdphead_raster)
+ext <- extent(gdphead_raster)
+gdp_hab_im <- im(
+  mat,
+  xcol = seq(ext@xmin, ext@xmax, length.out = ncol(mat)),
+  yrow = seq(ext@ymin, ext@ymax, length.out = nrow(mat))
+) 
+```
+
+Model
+
+```{r}
+ppm_model <- ppm(
+  police_clean_ppp ~ gdp_hab,
+  covariates = list(gdp_hab = gdp_hab_im)
+)
+summary(ppm_model)
+```
+
+Interpretation:
+
+-   For each extra unit of GDP/habitant, the intensity of crime is reduced by -2.989723e-04
+
+-   For each time there is an increase of one unit of GDP/habitant, we multiply the intensity of crime by 0.9997 (or reduce it by 3%)
 
 # Conclusion
