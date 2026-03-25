@@ -32,7 +32,7 @@ editor:
 
 #Importing data
 
-```{r}
+
 library("sf")
 library("mapview")
 library(spatstat)
@@ -123,6 +123,8 @@ Plot it
 ```{r}
 mapview(my_coords) #If it doesn't work try with leaflet
 ```
+
+
 ```{r}
 coords <- st_coordinates(my_coords)
 win <- as.owin(st_bbox(my_coords))
@@ -226,6 +228,10 @@ london_bbox <- st_bbox(c(
 
 #Conversion to sfc
 london_window <- st_as_sfc(london_bbox)
+
+
+
+my_coords <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
 
 
 #Restriction to the bbox
@@ -664,11 +670,7 @@ LSOA = geographic unit used by ONS (organism national statistics) of UK
 
 source: [United kingdom government: population estimate by LSOA](https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates)
 
-religion table:
 
-<https://www.ons.gov.uk/peoplepopulationandcommunity/culturalidentity/religion/adhocs/000088ct0088religionflatlondontolsoa>
-
-migrant table : <https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/adhocs/2209populationcountsofmigrantstatusbyethnicgroupacrosslowerlayersuperoutputareaenglandandwalescensus2021>
 
 LSOA table : <https://geoportal.statistics.gov.uk/datasets/0f80c523f3cd4d0fab5111572f84a2fb_0/explore>
 
