@@ -343,10 +343,44 @@ $$
 K\!\left( \frac{x - x_i}{h} \right)
 $$
 
+```{r}
+
+my_coords2 <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
+
+
+my_coords2 = st_transform(my_coords2, crs = 27700)
+# Coordonnées
+coords2 <- st_coordinates(my_coords2)
+
+
+
+map <- ne_countries(type = "countries", country = "United Kingdom",
+                    scale = "small", returnclass = "sf")
+
+
+map <- st_transform(map, crs = "EPSG:27700")
+win <- as.owin(map)
+
+
+pp <- ppp(
+  x = coords2[,1],
+  y = coords2[,2],
+  window = win
+)
+
+
+par(mfrow = c(1,1),
+    mar = c(1,1,1,1))  # bas, gauche, haut, droite
+
 
 # Plot
 plot(win, col = "lightgrey", main = "Spatial Point Pattern of Police Outcomes in the UK")
 plot(pp, add = TRUE, pch = 20, col = "blue",size = 0.8)
+
+
+
+
+
 
 ```
 
@@ -373,15 +407,24 @@ par(mfrow = c(2,2),
 
 plot(density(pp, sigma = 10000),
      main = "Bandwidth = 10000")
+contour(density(pp, sigma = 10000), add = TRUE) # contour plot
 
 plot(density(pp, sigma = 20000),
      main = "Bandwidth = 20000")
+contour(density(pp, sigma = 20000), add = TRUE) # contour plot
+
+
 
 plot(density(pp, sigma = 50000),
      main = "Bandwidth = 50000")
+contour(density(pp, sigma = 50000), add = TRUE) # contour plot
+
+
 
 plot(density(pp),
      main = "Default Bandwidth = 76634.26")
+contour(density(pp), add = TRUE) # contour plot
+
 
 # Titre global
 mtext("Intensity estimation with different bandwidths",
@@ -397,7 +440,7 @@ mtext("Intensity estimation with different bandwidths",
 ```{r}
 
 library(spatstat.geom)
-# 2️⃣ Définir bbox de Londres (EN WGS84 !)
+# Définir bbox de Londres (EN WGS84 !)
 london_bbox <- st_bbox(c(
   xmin = -0.6,
   xmax =  0.3,
@@ -405,30 +448,30 @@ london_bbox <- st_bbox(c(
   ymax = 51.7
 ), crs = 4326)
 
-# 3️⃣ Transformer bbox en 27700
+#  Transformer bbox en 27700
 london_window <- st_as_sfc(london_bbox)
 london_window <- st_transform(london_window, crs = 27700)
 
-# 4️⃣ Filtrer les points dans Londres
+#  Filtrer les points dans Londres
 
-my_coords3 = my_coords2 |> subset(Outcome.type == "Suspect charged")
+my_coords3 = my_coords2 # |> subset(Outcome.type == "Suspect charged")
 
 my_coords_london <- st_intersection(my_coords3, london_window)
 
-# 5️⃣ Coordonnées
+#  Coordonnées
 coords_london <- st_coordinates(my_coords_london)
 
-# 6️⃣ Fenêtre spatiale (IMPORTANT : utiliser london_window, pas bbox brute)
+# Fenêtre spatiale (IMPORTANT : utiliser london_window, pas bbox brute)
 win_london <- as.owin(london_window)
 
-# 7️⃣ Créer ppp
+# Créer ppp
 pp_london <- ppp(
   x = coords_london[,1],
   y = coords_london[,2],
   window = win_london
 )
 
-# 8️⃣ Plot
+# Plot
 par(mfrow = c(1,1), mar = c(1,1,1,1))
 
 plot(win_london, col = "lightgrey", main = "Police Outcomes in London")
@@ -443,41 +486,57 @@ lambdahat <- density(pp_london)
 attr(lambdahat, "sigma")
 ```
 
-```{r}
 
 
-par(mfrow = c(2,2),
-    mar = c(1,1,1,1),      # marges internes des graphiques
-    oma = c(0,0,2,0))      # marges externes (haut = 4)
+
+
+```{r, fig.width=10, fig.height=10}
+
 
 plot(density(pp_london, sigma = 1000),
      main = "Bandwidth = 1000")
+contour(density(pp_london, sigma = 1000), add = TRUE) # contour plot
 
-plot(density(pp_london, sigma = 5757.488),
-     main = "Bandwidth = 5757.488")
+
+plot(density(pp_london, sigma = 1250),
+     main = "Bandwidth = 1250")
+contour(density(pp_london, sigma = 1250), add = TRUE) # contour plot
+
+
+
 
 plot(density(pp_london, sigma = 500),
      main = "Bandwidth = 500")
+contour(density(pp_london, sigma = 500), add = TRUE) # contour plot
+
 
 plot(density(pp_london, sigma = 1500),
-     main = "Default Bandwidth = 1500")
+     main = "Bandwidth = 1500")
+contour(density(pp_london, sigma = 1500), add = TRUE, log = TRUE) # contour plot
+
 
 
 ```
 
-```{r}
+We notice a hotspot of crime in center of London
 
 
 
-# 1️⃣ Données en sf + projection UK
+
+
+```{r,fig.width=6, fig.height=10}
+
+
+
+#  Données en sf + projection UK
 my_coords2 <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
 my_coords2 <- st_transform(my_coords2, crs = 27700)
 
 
-my_coords3 = my_coords2 |> subset(Outcome.type == "Suspect charged")
+my_coords3 = my_coords2 # |> subset(Outcome.type == "Suspect charged")
 
 
-# 2️⃣ BBOX Londres (WGS84)
+#  BBOX Londres (WGS84)
 london_bbox <- st_bbox(c(
   xmin = -0.6,
   xmax =  0.3,
@@ -485,88 +544,34 @@ london_bbox <- st_bbox(c(
   ymax = 51.7
 ), crs = 4326)
 
-# 3️⃣ Conversion bbox + projection 27700
+#  Conversion bbox + projection 27700
 london_window <- st_as_sfc(london_bbox)
 london_window <- st_transform(london_window, crs = 27700)
 
-# 4️⃣ Filtrer points dans Londres
+#  Filtrer points dans Londres
 my_coords_london <- st_intersection(my_coords3, london_window)
 
-# 5️⃣ Coordonnées
+#  Coordonnées
 coords_london <- st_coordinates(my_coords_london)
 
-# 6️⃣ Fenêtre spatiale
+#  Fenêtre spatiale
 win_london <- as.owin(london_window)
 
-# 7️⃣ Objet ppp
+# Objet ppp
 pp_london <- ppp(
   x = coords_london[,1],
   y = coords_london[,2],
   window = win_london
 )
 
-# 8️⃣ Densité kernel
-dens <- density(pp_london, sigma = 3000)
 
-# 9️⃣ Conversion en raster
 
-r <- rast(dens)
-crs(r) <- "EPSG:27700"
 
-r_wgs84 <- project(r, "EPSG:4326")
-
-# 1️⃣1️⃣ Transformation des points et bbox pour leaflet
+#  Transformation des points et bbox pour leaflet
 points_wgs84 <- st_transform(my_coords_london, 4326)
 london_window_wgs84 <- st_transform(london_window, 4326)
 
-# 1️⃣2️⃣ Palette de couleurs
-pal <- colorNumeric("viridis", dens$v, na.color = "transparent")
 
-# 1️⃣3️⃣ Leaflet map
-leaflet() %>%
-  addTiles() %>%
-  
-  # Heatmap (densité)
-  addRasterImage(
-    r_wgs84,
-    colors = pal,
-    opacity = 0.5
-  ) %>%
-  
-  # Contour Londres
-  addPolygons(
-    data = london_window_wgs84,
-    fill = FALSE,
-    color = "black",
-    weight = 2
-  ) %>%
-  
-  # Points
-  addCircleMarkers(
-    data = points_wgs84,
-    radius = 1,
-    color = "black",
-    opacity = 0.2,
-    stroke = FALSE
-  ) |> setView( lng = -0.1000, lat = 51.51, zoom = 10)
-
-```
-
-### Import of population table (variable aggregated at LSOA level)
-
-LSOA = geographic unit used by ONS (organism national statistics) of UK
-
-source: [United kingdom government: population estimate by LSOA](https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates)
-
-religion table:
-
-<https://www.ons.gov.uk/peoplepopulationandcommunity/culturalidentity/religion/adhocs/000088ct0088religionflatlondontolsoa>
-
-migrant table : <https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/adhocs/2209populationcountsofmigrantstatusbyethnicgroupacrosslowerlayersuperoutputareaenglandandwalescensus2021>
-
-LSOA table : <https://geoportal.statistics.gov.uk/datasets/0f80c523f3cd4d0fab5111572f84a2fb_0/explore>
-
-```{r}
 # all geographic unit from UK
 LSOA_uk = st_read("LSOA.gpkg") 
 LSOA_uk <- st_transform(LSOA_uk, 4326)
@@ -585,29 +590,119 @@ index <- st_intersects(LSOA_uk, london_window_wgs84)
 LSOA_in_window <- LSOA_uk[lengths(index) > 0, ]
 
 
+
+london_full =st_union(LSOA_in_window) 
+
+
+# Fenêtre cohérente
+london_full_win <- as.owin(st_transform(london_full, 27700))
+
+
+# Objet ppp
+pp_london <- ppp(
+  x = coords_london[,1],
+  y = coords_london[,2],
+  window = london_full_win
+)
+
+
+
+#  Densité kernel
+dens <- density(pp_london, sigma = 3000)
+
+#  Conversion en raster
+
+library(terra)
+
+r <- rast(dens)
+crs(r) <- "EPSG:27700"
+
+# Projection
+r_wgs84 <- project(r, "EPSG:4326")
+
+
+# Palette de couleurs
+pal <- colorNumeric("viridis", dens$v, na.color = "transparent")
+
+#  Leaflet map
+leaflet() %>%
+  addTiles() %>%
+  
+  # Heatmap (densité)
+#  addRasterImage(
+#    r_wgs84,
+#    colors = pal,
+#    opacity = 0.6
+#  ) %>%
+  
+  # Contour Londres
+  #addPolygons(
+  #  data = london_full,
+  #  fill = FALSE,
+  #  color = "black",
+  #  weight = 2
+ # ) %>%
+  
+  # Points
+  addCircleMarkers(
+    data = points_wgs84,
+    radius = 1,
+    color = "black",
+    opacity = 0.2,
+    stroke = FALSE
+  ) |> addTiles("Spatial Point Pattern of crimes in London")
+
 ```
+
+
+
+### Import of population table (variable aggregated at LSOA level)
+ 
+
+ 
+LSOA = geographic unit used by ONS (organism national statistics) of UK
+
+source: [United kingdom government: population estimate by LSOA](https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates)
+
+religion table:
+
+<https://www.ons.gov.uk/peoplepopulationandcommunity/culturalidentity/religion/adhocs/000088ct0088religionflatlondontolsoa>
+
+migrant table : <https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/adhocs/2209populationcountsofmigrantstatusbyethnicgroupacrosslowerlayersuperoutputareaenglandandwalescensus2021>
+
+LSOA table : <https://geoportal.statistics.gov.uk/datasets/0f80c523f3cd4d0fab5111572f84a2fb_0/explore>
+
+
 
 Plot of all geographic unit
 
+
+
 ```{r}
+
+
 
 leaflet(LSOA_in_window) %>%
   addTiles() %>%
   addPolygons(
     weight = 0.5,       # épaisseur du trait
     color = "blue",     # couleur du contour
-    fill = FALSE        # pas de remplissage si tu veux juste les contours
-  ) |> # Contour Londres
+    fill = FALSE,        # pas de remplissage si tu veux juste les contours
+    opacity = 1  
+    ) |> # Contour Londres
   addPolygons(
-    data = london_window_wgs84,
-    fill = FALSE,
-    color = "black",
-    weight = 2
-  ) 
+  data = london_full,
+  fill = FALSE,
+  color = "black",
+  weight = 2
+  ) |>  addTiles("Area with population information in London")
 
 
 
 ```
+
+
+
 
 ```{r}
 
@@ -617,6 +712,9 @@ population = population[,1:5]
 
 ```
 
+
+
+
 ```{r}
 
 LSOA_in_window |> colnames()
@@ -624,18 +722,257 @@ LSOA_in_window_data_frame = LSOA_in_window[,1:4] |> as.data.frame()
 
 pop_london = LSOA_in_window |> left_join(population, by = c("LSOA01CD" = "LSOA 2021 Code"))
 
+
 sum(is.na(pop_london$Total))
 
 ```
+We remplace NA by mean for 3 nearest regions
+
 
 ```{r}
-table_var = list()
-for (i in colnames(police_clean)) {
-  table_var[[i]] = table(police_clean[i])
+
+
+# Assurons-nous que pop_london est un sf
+pop_london_sf <- st_as_sf(pop_london)
+
+# Vérifier NA
+sum(is.na(pop_london_sf$Total))
+
+# Séparer les NA et les non-NA
+na_rows <- pop_london_sf %>% filter(is.na(Total))
+non_na_rows <- pop_london_sf %>% filter(!is.na(Total))
+
+# Boucle sur chaque NA pour remplacer par moyenne des 3 voisins les plus proches
+for(i in seq_len(nrow(na_rows))) {
+  
+  # Centroid de l'objet courant (pour distance)
+  centroid_i <- st_centroid(na_rows[i, "SHAPE"])
+  
+  # Calculer distances aux objets non-NA
+  dists <- st_distance(centroid_i, st_centroid(non_na_rows$SHAPE))
+  
+  # Trier et prendre les 3 plus proches
+  nearest_idx <- order(dists)[1:3]
+  
+  # Moyenne des voisins
+  na_rows$Total[i] <- mean(non_na_rows$Total[nearest_idx], na.rm = TRUE)
 }
+
+# Combiner avec le reste
+pop_london_imputed <- bind_rows(non_na_rows, na_rows)
+
+# Vérifier qu'il n'y a plus de NA
+sum(is.na(pop_london_imputed$Total))
+
+
 ```
 
-There are too much point to do an analysis, we decided to work only on cases where the offender has been taken to the tribunal "Suspect charged"
+We transform pop_london_sf in a point patern weighted population by taking centroid of each region
+
+
+
+```{r}
+
+
+# Calcul des centroïdes
+pop_london_points <- st_centroid(pop_london_imputed)
+
+
+library(scales)
+
+radius <- rescale(sqrt(pop_london_points$Total), to = c(1, 6))
+
+leaflet(pop_london_points) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    radius = radius,
+    stroke = FALSE,
+    fillOpacity = 0.6,
+    color = "red",
+    popup = ~paste0("Population: ", Total)
+  )
+```
+
+
+
+
+Plot of intensity population in London
+
+```{r, fig.height=10, fig.width=10}
+
+# Reprojection AVANT centroid
+pop_london_proj <- st_transform(pop_london_imputed, 27700)
+
+# Centroïdes dans le bon système
+pop_london_points <- st_centroid(pop_london_proj)
+
+# Coordonnées cohérentes
+coords <- st_coordinates(pop_london_points)
+
+# Fenêtre cohérente
+win <- as.owin(st_union(pop_london_proj))
+
+# 4. Point pattern pondéré
+pop_point_pattern <- ppp(
+  x = coords[,1],
+  y = coords[,2],
+  window = win,
+  marks = pop_london_points$Total
+)
+
+# 5. Estimation de densité kernel pondérée
+dens <- density(
+  pop_point_pattern,
+  weights = pop_point_pattern$marks,
+  sigma = bw.diggle(pop_point_pattern)
+)
+# 6. Plot
+plot(dens, main = "Intensity population (kernel)")
+contour(dens, add = TRUE)
+
+```
+
+
+
+
+
+
+
+```{r}
+
+
+#  Transformation des points et bbox pour leaflet
+points_wgs84 <- st_transform(my_coords_london, 4326)
+london_window_wgs84 <- st_transform(london_window, 4326)
+
+
+# Convertir la densité (spatstat im) en raster
+dens_raster <- rast(dens)
+
+crs(dens_raster) <- "EPSG:27700"
+
+# Projection en WGS84 pour leaflet
+# Projection
+r_wgs84 <- project(dens_raster, "EPSG:4326")
+# Palette de couleurs
+pal <- colorNumeric("viridis", values(r_wgs84), na.color = "transparent")
+
+# Plot leaflet
+leaflet() %>%
+  addTiles() %>%
+  addRasterImage(
+    r_wgs84,
+    colors = pal,
+    opacity = 0.8
+  ) 
+
+
+```
+
+
+### Intensity ratio
+
+
+
+
+Intensity Ratio and Spatial Relative Risk
+
+We consider two spatial point patterns observed over the same region: a set of cases (for example, individuals affected by a disease) and a set of controls representing the population at risk. The objective is to compare these two patterns in order to identify spatial variations in risk and detect potential high-risk areas.
+
+We assume that the cases arise from a Poisson process with intensity $\lambda(x)$, while the controls arise from an independent Poisson process with intensity $\lambda_0(x)$. The relationship between these two intensities can be expressed as:
+$$
+\lambda(x) = \alpha \, \lambda_0(x) \, \rho(x)
+$$
+
+In this decomposition, $\rho(x)$ represents the spatial relative risk, while $\alpha$ is a scaling factor introduced to account for the difference in the number of observed points between the two patterns.
+
+Since the number of controls is typically larger than the number of cases, the scaling factor is estimated as:
+
+$$
+\hat{\alpha} = \frac{n_{\text{cases}}}{n_{\text{controls}}}
+$$
+
+This correction ensures that the comparison between the two intensities is not biased by differences in sample size.
+
+The intensity functions $\lambda(x)$ and $\lambda_0(x)$ are not known and must be estimated from the data. This is commonly done using kernel smoothing methods. The estimator of the intensity at location $x$ is given by:
+
+$$
+\hat{\lambda}(x) = \sum_{i=1}^{n} K_\sigma(x - x_i)
+$$
+
+where $K_\sigma$ is a kernel function (typically Gaussian) and $\sigma$ is the bandwidth parameter controlling the degree of smoothing. In practice, we compute two estimates: $\hat{\lambda}(x)$ for the cases and $\hat{\lambda}_0(x)$ for the controls.
+
+The spatial relative risk is then estimated by taking the ratio of these smoothed intensities:
+
+
+$$
+\hat{\rho}(x) = \frac{\hat{\lambda}(x)}{\hat{\alpha} \, \hat{\lambda}_0(x)}
+$$
+
+This estimator provides a continuous surface describing how the risk varies across space.
+
+An important practical issue is the choice of the bandwidth. To ensure a fair comparison between the two intensity estimates, it is recommended to use a common bandwidth for both datasets. A simple and commonly used approach consists in taking the average of the optimal bandwidths computed separately for cases and controls:
+
+
+$$
+bw = \frac{bw_{\text{cases}} + bw_{\text{controls}}}{2}
+$$
+
+
+The interpretation of the relative risk surface is straightforward. When $\hat{\rho}(x) > 1$, the location $x$ corresponds to an area where the risk is higher than average, often referred to as a hotspot. When $\hat{\rho}(x) < 1$, the risk is lower than average. Values close to 1 indicate no significant deviation from the baseline risk.
+
+Finally, the estimated relative risk surface is typically visualized as a map, which allows for an intuitive identification of spatial patterns. This approach is widely used in spatial epidemiology, although it remains sensitive to the choice of bandwidth and relies on the assumption of Poisson processes.
+
+
+
+
+
+
+
+
+
+Crime VS population
+
+
+```{r}
+
+
+
+# crimes = ppp_crimes
+# population = pop_point_pattern (avec marks = Total)
+
+# 1. Créer ppp population non marqué (juste positions)
+pop_ppp <- unmark(pop_point_pattern)
+
+# 2. Bande passante commune
+#bw_crime <- attr(density(pp_london), "sigma")
+bw_crime = 1000
+bw_pop <- attr(density(pop_ppp), "sigma")
+bw <- (bw_crime + bw_pop) / 2
+
+# 3. Densités
+int_crime <- density(pp_london, sigma = bw)
+int_pop <- density(pop_ppp, sigma = bw, weights = pop_point_pattern$marks)
+
+# 4. alpha
+alpha <- pp_london$n / sum(pop_point_pattern$marks)
+
+# 5. Ratio
+rr <- t(int_crime$v) / t(alpha * int_pop$v)
+
+library(fields)
+
+# 6. Plot
+image.plot(int_crime$xcol, int_crime$yrow, rr, asp = 1,
+           main = "Relative Risk (Crimes charged vs Population)")
+#contour(int_crime, add = TRUE)
+
+```
+
+
+In conclusion, even after controlling for the population at risk, the analysis shows that the center of London exhibits a substantially higher relative risk, indicating that individuals in this area are much more likely to be affected.
+
+
 
 # IV/ The k-function
 
