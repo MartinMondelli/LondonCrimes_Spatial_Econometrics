@@ -30,6 +30,17 @@ editor:
 
 ```{r setup, include=FALSE}
 
+#Importing data
+
+```{r}
+library("sf")
+library("mapview")
+library(spatstat)
+library(spatstat.geom)
+```
+
+```{r}
+police = read.csv("2025-07-metropolitan-outcomes.csv")
 if (!require(knitr))      install.packages("knitr")
 
 library(knitr)
@@ -98,8 +109,6 @@ Filtering and we keep only police_clean
 
 ```{r}
 police_clean <- police[!is.na(police$Longitude) & !is.na(police$Latitude),]
-rm(police, path_data)
-gc()
 ```
 
 Making it sf
@@ -114,7 +123,6 @@ Plot it
 ```{r}
 mapview(my_coords) #If it doesn't work try with leaflet
 ```
-
 ```{r}
 coords <- st_coordinates(my_coords)
 win <- as.owin(st_bbox(my_coords))
@@ -125,7 +133,146 @@ police_clean_ppp <- ppp(
 )
 ```
 
-# II/ Complete Spatial Randomness
+
+## Quadrat test
+
+We want to test whether points are distributed uniformly on our surface of interest or not. To do so, we use the Quadrat test. It consists in drawing a L\*l grid around our space of concern and count the number of points included in each square of our grid. Then, a $X^2 =\Sigma_{i=1}^m\frac{(observed_i-expected)^2}{expected}$ statistic is computed, with $m$ the number of squares composing the grid, $observed_i$ the number of points contained in the rectangle $i$ and $expected = \frac{Total \space number \space of \space points}{L*l}$ the expected number of points in each square of the grid if they were to be distributed uniformly. This $X^2$ statistic converges towards a $\chi^2$. It suffices then to compare $X^2$ to the quantiles of a $\chi^2_{m-1}$ law.
+
+There are three possible H0 for a Quadrat test :
+
+
+-   If H0 : «The points are distributed uniformly in the grid» we reject H0 at level $\alpha$ if $|X^2|>\chi^2_{m-1,1-\frac{\alpha}{2}}$ . In this case, H1 is «The points are not distributed uniformly in the grid».
+
+-   If H0 : «The points are distributed following a CSR or regular pattern in the grid» we reject HO at level $\alpha$ if $X^2>\chi^2_{m-1,1-\alpha}$. In this case, H1 is «The points are distributed following a clustered pattern in the grid»
+
+-   If H0 «The points are distributed following a CSR or clustered pattern in the grid» we reject HO at level $\alpha$ if $X^2<\chi^2_{m-1,1-\alpha}$. In this case, H1 is «The points are distributed following a regular pattern in the grid».
+
+It is important to note that the results of the test is dependent on the definition of the grid, left at the discretion of the statistician. As such, it is important to adapt the grid to the precision wanted and test different configurations to make sure we are not concluding because of statistical artifacts.
+
+
+
+```{r}
+X <- as.ppp(st_coordinates(my_coords), st_bbox(my_coords)) #Turn sf into ppp
+```
+
+We test H0 :
+
+-   «The points are distributed uniformly in a 100\*120 grid»
+
+-   «The points are distributed following a CSR or clustered pattern in a 100\*120 grid»
+
+-   «The points are distributed following a CSR or regular pattern in a 100\*120 grid»
+
+```{r}
+Q <- quadratcount(X, nx = 100, ny = 120) #Transform ppp into a nx*ny grid. As England is elongated, we use an elongated grid
+
+quadrat.test(Q) #p-value < 0.001 ==> there is a pattern of distribution
+quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a regular pattern
+quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
+
+```
+
+Our three tests converge towards the same answer : there is a point pattern consisting of a clustering of points. But the Quadrat method is dependent on our definition of the Q grid. Let us run the same test but with a much smaller, 2\*2 grid.\
+We test H0 respectively:
+
+-   «The points are distributed uniformly in a 2\*2 grid»
+
+-   «The points are distributed following a CSR or clustered pattern in a 2\*2 grid»
+
+-   «The points are distributed following a CSR or regular pattern in a 2\*2 grid»
+
+
+```{r}
+Q <- quadratcount(X, nx = 2, ny = 2) #Transform ppp into a nx*ny grid. As England is elongated, we use an elongated grid
+
+quadrat.test(Q) #p-value < 0.001 ==> there is a pattern of distribution
+quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a regular pattern
+quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
+```
+
+
+Results remain unchanged. Let us take a much larger 1000\*1200 grid this time.
+
+
+We test H0 respectively:
+
+-   «The points are distributed uniformly in a 1000\*1200 grid»
+
+-   «The points are distributed following a CSR or clustered pattern in a 1000\*1200 grid»
+
+-   «The points are distributed following a CSR or regular pattern in a 1000\*1200 grid»
+
+```{r}
+Q <- quadratcount(X, nx = 1000, ny = 1200) #Transform ppp into a nx*ny grid. As England is elongated, we use an elongated grid
+
+quadrat.test(Q) #p-value < 0.001 ==> there is a pattern of distribution
+quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a regular pattern
+quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
+```
+
+No matter the grid, it seems that London has too much points clustered in it.
+
+Let us restrict our scope to greater London:
+
+```{r}
+
+#Define a bbox around London with the norm WGS84
+london_bbox <- st_bbox(c(
+  xmin = -0.5,
+  xmax =  0.3,
+  ymin = 51.3,
+  ymax = 51.7
+), crs = st_crs(4326))
+
+#Conversion to sfc
+london_window <- st_as_sfc(london_bbox)
+
+
+#Restriction to the bbox
+my_coords_london <- my_coords[london_window, ]
+
+
+#Conversion to ppp
+X <- as.ppp(
+  st_coordinates(my_coords_london),
+  W = as.owin(london_bbox)
+)
+
+
+
+
+
+#Visualize the point repartition in Greater London
+plot(X,size=0.1,main="Spatial repartition of the crimes in Greater London") 
+
+```
+
+
+This first plot shows that the Greater London area is very heterogeneous. The outskirts are low-density rural town with little to no crime reported. Likewise, the Thames river and the marshes appear clearly by contrast : no crimes are reported on the waters.
+
+```{r}
+#Creates a 10*10 grid used in the Quadrat test and displays the amount of crimes reported in each rectangle
+Q <- quadratcount(X, nx=10, ny=10)
+vals <- as.vector(as.matrix(Q))
+cols <- hcl.colors(100, "YlOrRd")
+col_index <- cut(vals, breaks=100, labels=FALSE)
+col_matrix <- matrix(cols[col_index], nrow=nrow(Q), ncol=ncol(Q))
+
+#Plot of Q as a heatmap
+plot(Q, col=col_matrix, main="Quadrat of the crimes in Greater London")
+```
+
+From this matrix, one can guess that there is obviously a concentration of points that is not random. Let us test the hypothesis same H0's as before, with a 10\*10 grid.
+
+```{r}
+Q <- quadratcount(X, nx = 10, ny = 10) #Transform ppp into a nx*ny grid. 
+
+quadrat.test(Q) #p-value < 0.001 ==> there is a pattern of distribution
+quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a regular pattern
+quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
+```
+
+The results are no surprise : points are clustered, even when looking at Greater London only.
 
 # III/ Intensity estimation
 
@@ -196,44 +343,10 @@ $$
 K\!\left( \frac{x - x_i}{h} \right)
 $$
 
-```{r}
-
-my_coords2 <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
-
-
-my_coords2 = st_transform(my_coords2, crs = 27700)
-# Coordonnées
-coords2 <- st_coordinates(my_coords2)
-
-
-
-map <- ne_countries(type = "countries", country = "United Kingdom",
-                    scale = "small", returnclass = "sf")
-
-
-map <- st_transform(map, crs = "EPSG:27700")
-win <- as.owin(map)
-
-
-pp <- ppp(
-  x = coords2[,1],
-  y = coords2[,2],
-  window = win
-)
-
-
-par(mfrow = c(1,1),
-    mar = c(1,1,1,1))  # bas, gauche, haut, droite
-
 
 # Plot
 plot(win, col = "lightgrey", main = "Spatial Point Pattern of Police Outcomes in the UK")
 plot(pp, add = TRUE, pch = 20, col = "blue",size = 0.8)
-
-
-
-
-
 
 ```
 
@@ -511,7 +624,6 @@ LSOA_in_window_data_frame = LSOA_in_window[,1:4] |> as.data.frame()
 
 pop_london = LSOA_in_window |> left_join(population, by = c("LSOA01CD" = "LSOA 2021 Code"))
 
-
 sum(is.na(pop_london$Total))
 
 ```
@@ -521,12 +633,6 @@ table_var = list()
 for (i in colnames(police_clean)) {
   table_var[[i]] = table(police_clean[i])
 }
-```
-
-```{r}
-
-table_var$Outcome.type
-
 ```
 
 There are too much point to do an analysis, we decided to work only on cases where the offender has been taken to the tribunal "Suspect charged"
@@ -866,3 +972,10 @@ Interpretation:
 # Conclusion
 
 The three methods to test spatial correlation presented conclude that there is a strong correlation between the crimes and the regions. Crimes do not happen randomly at a given place but they are driven by certain factors. We regressed the crimes on the population and on gdp per capita separetly and we find that there is a clear link between the GDP per capita and the crimes. The higher the GDP per capita the lower the crimes. When regressing the two variables together GDP per capita decreases the number of crimes and the number of habitants increases it. However, the coefficients are small. This indicates that there might be some other cofunders and perhaps the use of IV might be useful.
+
+
+#A replacer
+
+par(mfrow = c(1,1),
+    mar = c(1,1,1,1))  # bas, gauche, haut, droite
+
