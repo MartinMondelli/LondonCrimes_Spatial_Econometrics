@@ -53,15 +53,23 @@ if (!require(mapview))      install.packages("mapview")
 if (!require(rnaturalearth))      install.packages("rnaturalearth")
 if (!require(spatstat))      install.packages("spatstat")
 if (!require(leaflet))      install.packages("leaflet")
+if (!require(spatstat.geom))      install.packages("spatstat.geom")
+if (!require(raster))      install.packages("raster")
+if (!require(terra))      install.packages("terra")
+if (!require(tidyverse))      install.packages("tidyverse")
 
 
 # charge les packages
-library("sf")
-library("mapview")
-library(rnaturalearth)
-library(spatstat)
-library(leaflet)
-
+require(readxl)
+require("sf")
+require("mapview")
+require(rnaturalearth)
+require(spatstat)
+require(leaflet)
+require(spatstat.geom)
+require(raster)
+require(terra)
+require(tidyverse)
 
 # chemin adaptatif vers les données 
 path_data = paste(getwd(), "2025-07-metropolitan-outcomes.csv", sep = "/")
@@ -69,6 +77,16 @@ path_data = paste(getwd(), "2025-07-metropolitan-outcomes.csv", sep = "/")
 police = read.csv(path_data)
 
 ```
+
+# Data base presentation
+
+For this project we used two datasets:
+
+-   For the regressions we used a dataset containing information on the population and GDP among other variables that we did not use in this project (<https://www.ons.gov.uk/economy/grossdomesticproductgdp/datasets/regionalgrossdomesticproductlocalauthorities>)
+
+-   
+
+# I/ Spatial Point Patterns Introduction
 
 Counting number of NAs
 
@@ -89,16 +107,34 @@ Making it sf
 
 ```{r}
 my_coords <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
-my_coords <- st_transform(my_coords, 27700)
+
 ```
 
 Plot it
 
 ```{r}
-mapview(my_coords) #If it doesn't work try with leaflet
+
+
+#  Leaflet map
+leaflet() %>%
+  addTiles() %>%
+  # Points
+  addCircleMarkers(
+    data = my_coords,
+    radius = 5,
+    color = "blue",
+    opacity = 0.2,
+    stroke = FALSE
+  ) 
+
+
+
+#mapview(my_coords) #If it doesn't work try with leaflet
 ```
 
 ```{r}
+my_coords <- st_transform(my_coords, 27700)
+
 coords <- st_coordinates(my_coords)
 win <- as.owin(st_bbox(my_coords))
 police_clean_ppp <- ppp(
@@ -108,15 +144,9 @@ police_clean_ppp <- ppp(
 )
 ```
 
-# Data base presentation
-
-# I/ Spatial Point Patterns Introduction
-
 # II/ Complete Spatial Randomness
 
 # III/ Intensity estimation
-
-## Theory
 
 The intensity function of a spatial point process $\{X_1, X_2, \dots, X_{N(A)}\}$ in a planar window $A \subset \mathbb{R}^2$ is defined as:
 
@@ -171,9 +201,7 @@ p_h(x) = \int_A h^{-2}
 K\!\left( \frac{x - u}{h} \right) du
 $$
 
-
 $p_h(x)$ represents the proportion of the kernel centered at $x$ that lies within the study region $A$ to correct the negative bias that occurs near the boundaries.
-
 
 $$ 
 \longrightarrow \hat{f}(x) = \frac{1}{n p_h(x)}  \sum_{i=1}^{n} \frac{1}{h^2} 
@@ -186,12 +214,6 @@ $$
 \longrightarrow \hat{\lambda}(x) = \frac{1}{p_h(x)}  \sum_{i=1}^{n} \frac{1}{h^2} 
 K\!\left( \frac{x - x_i}{h} \right)
 $$
-
-
-
-
-
-
 
 ```{r}
 
@@ -230,9 +252,11 @@ plot(pp, add = TRUE, pch = 20, col = "blue",size = 0.8)
 
 
 
+
+
 ```
 
-## Intensity estimation in practice
+## Intensity estimation
 
 Possible kernels are : gaussian, epanechnikov, quartic, disc or a personalized function
 
@@ -255,15 +279,24 @@ par(mfrow = c(2,2),
 
 plot(density(pp, sigma = 10000),
      main = "Bandwidth = 10000")
+contour(density(pp, sigma = 10000), add = TRUE) # contour plot
 
 plot(density(pp, sigma = 20000),
      main = "Bandwidth = 20000")
+contour(density(pp, sigma = 20000), add = TRUE) # contour plot
+
+
 
 plot(density(pp, sigma = 50000),
      main = "Bandwidth = 50000")
+contour(density(pp, sigma = 50000), add = TRUE) # contour plot
+
+
 
 plot(density(pp),
      main = "Default Bandwidth = 76634.26")
+contour(density(pp), add = TRUE) # contour plot
+
 
 # Titre global
 mtext("Intensity estimation with different bandwidths",
@@ -274,18 +307,544 @@ mtext("Intensity estimation with different bandwidths",
 
 ```
 
+### Focus on London
+
 ```{r}
-table_var = list()
-for (i in colnames(police_clean)) {
-  table_var[[i]] = table(police_clean[i])
+
+library(spatstat.geom)
+# Définir bbox de Londres (EN WGS84 !)
+london_bbox <- st_bbox(c(
+  xmin = -0.6,
+  xmax =  0.3,
+  ymin = 51.3,
+  ymax = 51.7
+), crs = 4326)
+
+#  Transformer bbox en 27700
+london_window <- st_as_sfc(london_bbox)
+london_window <- st_transform(london_window, crs = 27700)
+
+#  Filtrer les points dans Londres
+
+my_coords3 = my_coords2 # |> subset(Outcome.type == "Suspect charged")
+
+my_coords_london <- st_intersection(my_coords3, london_window)
+
+#  Coordonnées
+coords_london <- st_coordinates(my_coords_london)
+
+# Fenêtre spatiale (IMPORTANT : utiliser london_window, pas bbox brute)
+win_london <- as.owin(london_window)
+
+# Créer ppp
+pp_london <- ppp(
+  x = coords_london[,1],
+  y = coords_london[,2],
+  window = win_london
+)
+
+# Plot
+par(mfrow = c(1,1), mar = c(1,1,1,1))
+
+plot(win_london, col = "lightgrey", main = "Police Outcomes in London")
+plot(pp_london, add = TRUE, pch = 20,size = 0.1, col = "blue")
+
+
+```
+
+```{r}
+# kernel gaussian
+lambdahat <- density(pp_london)
+attr(lambdahat, "sigma")
+```
+
+
+
+
+
+```{r, fig.width=10, fig.height=10}
+
+
+plot(density(pp_london, sigma = 1000),
+     main = "Bandwidth = 1000")
+contour(density(pp_london, sigma = 1000), add = TRUE) # contour plot
+
+
+plot(density(pp_london, sigma = 1250),
+     main = "Bandwidth = 1250")
+contour(density(pp_london, sigma = 1250), add = TRUE) # contour plot
+
+
+
+
+plot(density(pp_london, sigma = 500),
+     main = "Bandwidth = 500")
+contour(density(pp_london, sigma = 500), add = TRUE) # contour plot
+
+
+plot(density(pp_london, sigma = 1500),
+     main = "Bandwidth = 1500")
+contour(density(pp_london, sigma = 1500), add = TRUE, log = TRUE) # contour plot
+
+
+
+```
+
+We notice a hotspot of crime in center of London
+
+
+
+
+
+```{r,fig.width=6, fig.height=10}
+
+
+
+#  Données en sf + projection UK
+my_coords2 <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
+my_coords2 <- st_transform(my_coords2, crs = 27700)
+
+
+my_coords3 = my_coords2 # |> subset(Outcome.type == "Suspect charged")
+
+
+#  BBOX Londres (WGS84)
+london_bbox <- st_bbox(c(
+  xmin = -0.6,
+  xmax =  0.3,
+  ymin = 51.3,
+  ymax = 51.7
+), crs = 4326)
+
+#  Conversion bbox + projection 27700
+london_window <- st_as_sfc(london_bbox)
+london_window <- st_transform(london_window, crs = 27700)
+
+#  Filtrer points dans Londres
+my_coords_london <- st_intersection(my_coords3, london_window)
+
+#  Coordonnées
+coords_london <- st_coordinates(my_coords_london)
+
+#  Fenêtre spatiale
+win_london <- as.owin(london_window)
+
+# Objet ppp
+pp_london <- ppp(
+  x = coords_london[,1],
+  y = coords_london[,2],
+  window = win_london
+)
+
+
+
+
+#  Transformation des points et bbox pour leaflet
+points_wgs84 <- st_transform(my_coords_london, 4326)
+london_window_wgs84 <- st_transform(london_window, 4326)
+
+
+# all geographic unit from UK
+LSOA_uk = st_read("LSOA.gpkg") 
+LSOA_uk <- st_transform(LSOA_uk, 4326)
+
+
+
+
+
+# london_window_wgs84 = Window polygone
+
+# 1 found LSOA that touch london_window_wgs84
+
+index <- st_intersects(LSOA_uk, london_window_wgs84)
+
+# We keep LSOA that at least one intersection with london_window_wgs84
+LSOA_in_window <- LSOA_uk[lengths(index) > 0, ]
+
+
+
+london_full =st_union(LSOA_in_window) 
+
+
+# Fenêtre cohérente
+london_full_win <- as.owin(st_transform(london_full, 27700))
+
+
+# Objet ppp
+pp_london <- ppp(
+  x = coords_london[,1],
+  y = coords_london[,2],
+  window = london_full_win
+)
+
+
+
+#  Densité kernel
+dens <- density(pp_london, sigma = 3000)
+
+#  Conversion en raster
+
+library(terra)
+
+r <- rast(dens)
+crs(r) <- "EPSG:27700"
+
+# Projection
+r_wgs84 <- project(r, "EPSG:4326")
+
+
+# Palette de couleurs
+pal <- colorNumeric("viridis", dens$v, na.color = "transparent")
+
+#  Leaflet map
+leaflet() %>%
+  addTiles() %>%
+  
+  # Heatmap (densité)
+#  addRasterImage(
+#    r_wgs84,
+#    colors = pal,
+#    opacity = 0.6
+#  ) %>%
+  
+  # Contour Londres
+  #addPolygons(
+  #  data = london_full,
+  #  fill = FALSE,
+  #  color = "black",
+  #  weight = 2
+ # ) %>%
+  
+  # Points
+  addCircleMarkers(
+    data = points_wgs84,
+    radius = 1,
+    color = "black",
+    opacity = 0.2,
+    stroke = FALSE
+  ) |> addTiles("Spatial Point Pattern of crimes in London")
+
+```
+
+
+
+### Import of population table (variable aggregated at LSOA level)
+ 
+
+ 
+LSOA = geographic unit used by ONS (organism national statistics) of UK
+
+source: [United kingdom government: population estimate by LSOA](https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates)
+
+religion table:
+
+<https://www.ons.gov.uk/peoplepopulationandcommunity/culturalidentity/religion/adhocs/000088ct0088religionflatlondontolsoa>
+
+migrant table : <https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/adhocs/2209populationcountsofmigrantstatusbyethnicgroupacrosslowerlayersuperoutputareaenglandandwalescensus2021>
+
+LSOA table : <https://geoportal.statistics.gov.uk/datasets/0f80c523f3cd4d0fab5111572f84a2fb_0/explore>
+
+
+
+Plot of all geographic unit
+
+
+
+```{r}
+
+
+
+leaflet(LSOA_in_window) %>%
+  addTiles() %>%
+  addPolygons(
+    weight = 0.5,       # épaisseur du trait
+    color = "blue",     # couleur du contour
+    fill = FALSE,        # pas de remplissage si tu veux juste les contours
+    opacity = 1  
+    ) |> # Contour Londres
+  addPolygons(
+  data = london_full,
+  fill = FALSE,
+  color = "black",
+  weight = 2
+  ) |>  addTiles("Area with population information in London")
+
+
+
+```
+
+
+
+
+```{r}
+
+population <- read_excel("population.xlsx", 
+    sheet = "Mid-2024 LSOA 2021", skip = 3)
+population = population[,1:5]
+
+```
+
+
+
+
+```{r}
+
+LSOA_in_window |> colnames()
+LSOA_in_window_data_frame = LSOA_in_window[,1:4] |> as.data.frame()
+
+pop_london = LSOA_in_window |> left_join(population, by = c("LSOA01CD" = "LSOA 2021 Code"))
+
+
+sum(is.na(pop_london$Total))
+
+```
+We remplace NA by mean for 3 nearest regions
+
+
+```{r}
+
+
+# Assurons-nous que pop_london est un sf
+pop_london_sf <- st_as_sf(pop_london)
+
+# Vérifier NA
+sum(is.na(pop_london_sf$Total))
+
+# Séparer les NA et les non-NA
+na_rows <- pop_london_sf %>% filter(is.na(Total))
+non_na_rows <- pop_london_sf %>% filter(!is.na(Total))
+
+# Boucle sur chaque NA pour remplacer par moyenne des 3 voisins les plus proches
+for(i in seq_len(nrow(na_rows))) {
+  
+  # Centroid de l'objet courant (pour distance)
+  centroid_i <- st_centroid(na_rows[i, "SHAPE"])
+  
+  # Calculer distances aux objets non-NA
+  dists <- st_distance(centroid_i, st_centroid(non_na_rows$SHAPE))
+  
+  # Trier et prendre les 3 plus proches
+  nearest_idx <- order(dists)[1:3]
+  
+  # Moyenne des voisins
+  na_rows$Total[i] <- mean(non_na_rows$Total[nearest_idx], na.rm = TRUE)
 }
+
+# Combiner avec le reste
+pop_london_imputed <- bind_rows(non_na_rows, na_rows)
+
+# Vérifier qu'il n'y a plus de NA
+sum(is.na(pop_london_imputed$Total))
+
+
 ```
+
+We transform pop_london_sf in a point patern weighted population by taking centroid of each region
+
+
 
 ```{r}
 
-table_var$Outcome.type
+
+# Calcul des centroïdes
+pop_london_points <- st_centroid(pop_london_imputed)
+
+
+library(scales)
+
+radius <- rescale(sqrt(pop_london_points$Total), to = c(1, 6))
+
+leaflet(pop_london_points) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    radius = radius,
+    stroke = FALSE,
+    fillOpacity = 0.6,
+    color = "red",
+    popup = ~paste0("Population: ", Total)
+  )
+```
+
+
+
+
+Plot of intensity population in London
+
+```{r, fig.height=10, fig.width=10}
+
+# Reprojection AVANT centroid
+pop_london_proj <- st_transform(pop_london_imputed, 27700)
+
+# Centroïdes dans le bon système
+pop_london_points <- st_centroid(pop_london_proj)
+
+# Coordonnées cohérentes
+coords <- st_coordinates(pop_london_points)
+
+# Fenêtre cohérente
+win <- as.owin(st_union(pop_london_proj))
+
+# 4. Point pattern pondéré
+pop_point_pattern <- ppp(
+  x = coords[,1],
+  y = coords[,2],
+  window = win,
+  marks = pop_london_points$Total
+)
+
+# 5. Estimation de densité kernel pondérée
+dens <- density(
+  pop_point_pattern,
+  weights = pop_point_pattern$marks,
+  sigma = bw.diggle(pop_point_pattern)
+)
+# 6. Plot
+plot(dens, main = "Intensity population (kernel)")
+contour(dens, add = TRUE)
 
 ```
+
+
+
+
+
+
+
+```{r}
+
+
+#  Transformation des points et bbox pour leaflet
+points_wgs84 <- st_transform(my_coords_london, 4326)
+london_window_wgs84 <- st_transform(london_window, 4326)
+
+
+# Convertir la densité (spatstat im) en raster
+dens_raster <- rast(dens)
+
+crs(dens_raster) <- "EPSG:27700"
+
+# Projection en WGS84 pour leaflet
+# Projection
+r_wgs84 <- project(dens_raster, "EPSG:4326")
+# Palette de couleurs
+pal <- colorNumeric("viridis", values(r_wgs84), na.color = "transparent")
+
+# Plot leaflet
+leaflet() %>%
+  addTiles() %>%
+  addRasterImage(
+    r_wgs84,
+    colors = pal,
+    opacity = 0.8
+  ) 
+
+
+```
+
+
+### Intensity ratio
+
+
+
+
+Intensity Ratio and Spatial Relative Risk
+
+We consider two spatial point patterns observed over the same region: a set of cases (for example, individuals affected by a disease) and a set of controls representing the population at risk. The objective is to compare these two patterns in order to identify spatial variations in risk and detect potential high-risk areas.
+
+We assume that the cases arise from a Poisson process with intensity $\lambda(x)$, while the controls arise from an independent Poisson process with intensity $\lambda_0(x)$. The relationship between these two intensities can be expressed as:
+$$
+\lambda(x) = \alpha \, \lambda_0(x) \, \rho(x)
+$$
+
+In this decomposition, $\rho(x)$ represents the spatial relative risk, while $\alpha$ is a scaling factor introduced to account for the difference in the number of observed points between the two patterns.
+
+Since the number of controls is typically larger than the number of cases, the scaling factor is estimated as:
+
+$$
+\hat{\alpha} = \frac{n_{\text{cases}}}{n_{\text{controls}}}
+$$
+
+This correction ensures that the comparison between the two intensities is not biased by differences in sample size.
+
+The intensity functions $\lambda(x)$ and $\lambda_0(x)$ are not known and must be estimated from the data. This is commonly done using kernel smoothing methods. The estimator of the intensity at location $x$ is given by:
+
+$$
+\hat{\lambda}(x) = \sum_{i=1}^{n} K_\sigma(x - x_i)
+$$
+
+where $K_\sigma$ is a kernel function (typically Gaussian) and $\sigma$ is the bandwidth parameter controlling the degree of smoothing. In practice, we compute two estimates: $\hat{\lambda}(x)$ for the cases and $\hat{\lambda}_0(x)$ for the controls.
+
+The spatial relative risk is then estimated by taking the ratio of these smoothed intensities:
+
+
+$$
+\hat{\rho}(x) = \frac{\hat{\lambda}(x)}{\hat{\alpha} \, \hat{\lambda}_0(x)}
+$$
+
+This estimator provides a continuous surface describing how the risk varies across space.
+
+An important practical issue is the choice of the bandwidth. To ensure a fair comparison between the two intensity estimates, it is recommended to use a common bandwidth for both datasets. A simple and commonly used approach consists in taking the average of the optimal bandwidths computed separately for cases and controls:
+
+
+$$
+bw = \frac{bw_{\text{cases}} + bw_{\text{controls}}}{2}
+$$
+
+
+The interpretation of the relative risk surface is straightforward. When $\hat{\rho}(x) > 1$, the location $x$ corresponds to an area where the risk is higher than average, often referred to as a hotspot. When $\hat{\rho}(x) < 1$, the risk is lower than average. Values close to 1 indicate no significant deviation from the baseline risk.
+
+Finally, the estimated relative risk surface is typically visualized as a map, which allows for an intuitive identification of spatial patterns. This approach is widely used in spatial epidemiology, although it remains sensitive to the choice of bandwidth and relies on the assumption of Poisson processes.
+
+
+
+
+
+
+
+
+
+Crime VS population
+
+
+```{r}
+
+
+
+# crimes = ppp_crimes
+# population = pop_point_pattern (avec marks = Total)
+
+# 1. Créer ppp population non marqué (juste positions)
+pop_ppp <- unmark(pop_point_pattern)
+
+# 2. Bande passante commune
+#bw_crime <- attr(density(pp_london), "sigma")
+bw_crime = 1000
+bw_pop <- attr(density(pop_ppp), "sigma")
+bw <- (bw_crime + bw_pop) / 2
+
+# 3. Densités
+int_crime <- density(pp_london, sigma = bw)
+int_pop <- density(pop_ppp, sigma = bw, weights = pop_point_pattern$marks)
+
+# 4. alpha
+alpha <- pp_london$n / sum(pop_point_pattern$marks)
+
+# 5. Ratio
+rr <- t(int_crime$v) / t(alpha * int_pop$v)
+
+library(fields)
+
+# 6. Plot
+image.plot(int_crime$xcol, int_crime$yrow, rr, asp = 1,
+           main = "Relative Risk (Crimes charged vs Population)")
+#contour(int_crime, add = TRUE)
+
+```
+
+
+In conclusion, even after controlling for the population at risk, the analysis shows that the center of London exhibits a substantially higher relative risk, indicating that individuals in this area are much more likely to be affected.
+
+
 
 # IV/ The k-function
 
@@ -293,49 +852,41 @@ The K-function is defined as :
 
 $$
 K(s) = \frac{E(\text{number of n events within distance s of event i})}{\lambda}
-$$
-Where $\lambda$ is the intensity function. As mentioned before, it is defined, in the case of CSR as:
+$$ Where $\lambda$ is the intensity function. As mentioned before, it is defined, in the case of CSR as:
 
 $$
 \lambda = \frac{E(N(A))}{|A|}
-$$
-Where N(A) is the number of points in A and $|A|$ is the area of A. 
+$$ Where N(A) is the number of points in A and $|A|$ is the area of A.
 
 We can also rewrite the "number of n events within distance s of event i" as the number of points within a circle C of radius s and center i or more concise within region A: "number of points in C". Then, we can rewrite the K-function as:
 
 $$
 K(s) = \frac{E(\text{number of points in C})\times\frac{|C|}{|C|}}{\frac{E(\text{number of points in C)} }{|C|}}
-$$
-Which simplifies to : $K(s) = |C|=\pi\times s^2$.
+$$ Which simplifies to : $K(s) = |C|=\pi\times s^2$.
 
-As we mentioned before, CSR is our benchmark: this scenario means that all points are distributed randomly and there is no clustering or regular patterns. Meaning that points are neither too close or too separated. This interpretation is due to the fact that if we had a clustering situation while we suppose CSR, then it would be highly likely that there will be more points than expected under CSR close to a certain event i, thus driving the expectation in the numerator above the CSR scenario. In the case of regular pattern, we would have the opposite situation, there would be points that are quite separeted driving the number of expected points arround a certain event i down and thus decreasing K.   
+As we mentioned before, CSR is our benchmark: this scenario means that all points are distributed randomly and there is no clustering or regular patterns. Meaning that points are neither too close or too separated. This interpretation is due to the fact that if we had a clustering situation while we suppose CSR, then it would be highly likely that there will be more points than expected under CSR close to a certain event i, thus driving the expectation in the numerator above the CSR scenario. In the case of regular pattern, we would have the opposite situation, there would be points that are quite separeted driving the number of expected points arround a certain event i down and thus decreasing K.
 
 Before going to the application, let's define the estimator function of K when we do not assume CSR:
 
 $$
 \hat{K}(s) = \frac{\hat{E}(s)}{\hat{\lambda}}
-$$
-Where:
-$$
+$$ Where: $$
 \hat{E}(s)=\frac{1}{n}\sum_{i=1}^n\sum_{i \neq j}^{n-1}w_{ij}I(d_{ij}\le s)
-$$
-and $\hat{\lambda}$ the estimator of the intensity function as defined before.
+$$ and $\hat{\lambda}$ the estimator of the intensity function as defined before.
 
-This estimator is a quite forward estimation, in fact for the numerator we just count the number of points we actually see in the circle C for all possible points and we then take the mean to retrieve the average number of points in the circle C when we take different centroids. This gives us a clear idea of the number of neighboring events for each point on average. For the denominator, we just take the usual estimator for the intensity function as we saw before. 
+This estimator is a quite forward estimation, in fact for the numerator we just count the number of points we actually see in the circle C for all possible points and we then take the mean to retrieve the average number of points in the circle C when we take different centroids. This gives us a clear idea of the number of neighboring events for each point on average. For the denominator, we just take the usual estimator for the intensity function as we saw before.
 
 About the weights, we need them because there are certain events that cannot be considered as the others. For example, if we consider an event i that is at border of A, if we do not take into consideration the fact that a part of the circle C is located outside the region and thus has 0 probability of containing other events, we would have a negative bias for these points. Another reason to consider this weights is because: we might be considering a circle C that is too small or too large: in fact if we take a circle so small that cannot contain any other event, then we would have a negative bias. Inversely, if the circle is too big, we might be considering as neighbors events that are too far apart, thus producing a positive bias.
 
 The weights we can apply in the package spatstat are:
 
-- The border correction (Ripley 1988): $w_{ij}=1$ if C fits A, else it is equal to 0 (Ripley, 1988)
+-   The border correction (Ripley 1988): $w_{ij}=1$ if C fits A, else it is equal to 0 (Ripley, 1988)
 
-- The isotropic correction (Ohser 1983, Ripley 1988): $w_{ij} = \frac{\text{Total area of C}}{\text{Are of C in A}}$
+-   The isotropic correction (Ohser 1983, Ripley 1988): $w_{ij} = \frac{\text{Total area of C}}{\text{Are of C in A}}$
 
--The translate correction (Ohser 1983): 
-$$
-w_{ij} = \frac{|A|}{|A \cap (A+(x_i-x_j))|}
-$$
-It exist also the possibility to compute $\hat{K}(s)$ without $w_{i,j}$.
+-   The translate correction (Ohser 1983): $$
+    w_{ij} = \frac{|A|}{|A \cap (A+(x_i-x_j))|}
+    $$ It exist also the possibility to compute $\hat{K}(s)$ without $w_{i,j}$.
 
 ```{r}
 K <- Kest(
@@ -353,12 +904,7 @@ A variant of the $\hat{K}(s)$ function is the $\hat{L}(s)$ that is the square ro
 
 $$
 L(s) = \sqrt{\frac{K(s)}{\pi}}
-$$
-and 
-$$
-\hat{L}(s) = \sqrt{\frac{\hat{K}(s)}{\pi}}
-
-$$
+$$ and $\hat{L}(s) = \sqrt{\frac{\hat{K}(s)}{\pi}}$
 
 ```{r}
 L <- Lest(police_clean_ppp,
@@ -373,10 +919,10 @@ We have the same interpretations for the L-function.
 
 It is also possible to test for CSR using the K function and a Monte Carlo approximation:
 
-- Compute the $\hat{K}(s)$ of the real data.
-- Generate M number of spatial point patterns over A using homogeneous Poisson process (CSR).
-- Estimate $\hat{K}(s)$ and take the confidence interval of size 95\%.
-- Reject CSR if the real estimation is outside of the CI.
+-   Compute the $\hat{K}(s)$ of the real data.
+-   Generate M number of spatial point patterns over A using homogeneous Poisson process (CSR).
+-   Estimate $\hat{K}(s)$ and take the confidence interval of size 95%.
+-   Reject CSR if the real estimation is outside of the CI.
 
 This procedures gives us a more significant measure to test for CSR. In fact, it allows us (or not) to reject at confidence level 95% the precense of CSR.
 
@@ -385,10 +931,253 @@ E <- envelope(police_clean_ppp, Kest, nsim = 99)
 plot(E)
 ```
 
-##Conclusion
-Clearly the pattern is not random as the poisson distribution is clearly lower than the empirical K. The estimators (with the different corrections) are quite high meaning that the point pattern is clearly not random. For small radius we observe that the clustering is already important but it clearly explodes after 5 km.
+##Conclusion Clearly the pattern is not random as the poisson distribution is clearly lower than the empirical K. The estimators (with the different corrections) are quite high meaning that the point pattern is clearly not random. For small radius we observe that the clustering is already important but it clearly explodes after 5 km.
 
 Remark: one limitation, as we could see on the map above is that the points are quite centered in London and surroundings meaning that our estimation is driven mainly by this area.
 
+# V/ Regression
+
+We will do regression using the dataset from this website: <https://www.ons.gov.uk/economy/grossdomesticproductgdp/datasets/regionalgrossdomesticproductlocalauthorities?utm_source=chatgpt.com> It contains diverse indicators on areas in the United Kingdom, it was published in December 2019.
+
+First we need to import the shapes of the districts in the UK
+
+```{r}
+library(sf)
+areas <- st_read("Shape/Local_Authority_Districts_December_2019_GCB_UK.shp")
+```
+
+```{r}
+areas |>
+  dplyr::select(lad19cd, lad19nm) |>
+  head() #It works
+```
+
+We will use two variables:
+
+-   Total resident population numbers
+
+-   Gross domestic product per head at current market prices
+
+## For resident population numbers
+
+```{r}
+if (!require(readxl))      install.packages("readxl")
+library("readxl")
+library(raster)
+library(spatstat.geom)
+library(sp)
+
+path_data = paste(getwd(), "regionalgrossdomesticproductgdplocalauthorities.xlsx", sep = "/")
+
+number_residents <- read_excel(
+  path_data,
+  sheet = "Table 6",
+  skip = 1
+)
+```
+
+Renaming so that population and shapes coincide
+
+```{r}
+areas <- areas |> dplyr::rename( 
+  area_code = "lad19cd", 
+  area_name = "lad19nm" 
+  )
+
+number_residents <- number_residents |> dplyr::rename( 
+  area_code = "LA code", 
+  area_name = "LA name" 
+  )
+
+areas <- areas |>
+  dplyr::left_join(number_residents, by = "area_code")
+
+areas_vect <- as(areas, "Spatial")
+```
+
+Plot it
+
+```{r}
+plot(areas["2018"])
+```
+
+London area population/crimes:
+
+```{r}
+london_area <- areas %>% subset(`ITL1 Region` == 'London')
+london_crimes <- my_coords[grepl("^E0100", my_coords$LSOA.code), ]
+mapview(london_area["2018"]) +
+  mapview(london_crimes, col.regions = "red", alpha = 0.2, cex = 0.5)
+```
+
+It seems that there is no major link between the crimes commited and the number of residents in an area. We will try regression anyways.
+
+Proceed to regression
+
+```{r}
+#A raster is a database organized as a rectangular grid that is sub-divided into rectangular cells of equal area (in terms of the units of the coordinate reference system)
+r_template <- raster(extent(areas_vect))  #we use extent to get the same size as the number of points in the police dataset
+population_raster <- rasterize(
+  areas_vect,          #Our polygones
+  r_template,          #Raster base where they will be put
+  field = "X2018",     #Population in 2018
+  fun = mean,          #Take mean if various polygones are in the same area
+  background = NA      #NA for cases without any value
+)
+
+#Transform ppp into spatial points
+points_sp <- SpatialPoints(cbind(police_clean_ppp$x, police_clean_ppp$y),
+                           proj4string = crs(population_raster))
+
+#Extract population values for each point
+police_clean_ppp$number_residents <- raster::extract(population_raster, points_sp)
+
+#Only keep points where the value of population is not NA
+police_clean_ppp_filtered <- police_clean_ppp[!is.na(police_clean_ppp$number_residents)]
+population_raster[is.na(population_raster)] <- 0 #To double check (give them value 0)
+library(spatstat.geom)
+
+#Convert to im so that we can use it in ppm
+mat <- as.matrix(population_raster)
+ext <- extent(population_raster)
+number_residents_im <- im(
+  mat,
+  xcol = seq(ext@xmin, ext@xmax, length.out = ncol(mat)),
+  yrow = seq(ext@ymin, ext@ymax, length.out = nrow(mat))
+) 
+```
+
+Result
+
+```{r}
+ppm_model <- ppm(
+  police_clean_ppp ~ number_residents,
+  covariates = list(number_residents = number_residents_im)
+)
+summary(ppm_model)
+```
+
+Notes:
+
+-   Edge correction "border"
+
+-   82075 points
+
+-   Average intensity: 4.51e-07
+
+-   Area of the window: 1.81916e+11 square units
+
+-   Dummy points: fictive points used to approximate integral
+
+-   Intercept: -14.41 in logs (base log-intensity)
+
+-   When we increase by one unit the population, the log intensity deacreases by -9.91e-05 or alternatively, when we increase by 1 unit population, intensity is multiplied by 0.9999.
+
+What is probably happening is that the number of inhabitants in a region might not explain by itself the number of crimes, it is probably a problem of IV.
+
+## For product per head
+
+```{r}
+product_head <- read_excel(
+  path_data,
+  sheet = "Table 7",
+  skip = 1
+)
+
+areas <- st_read("Shape/Local_Authority_Districts_December_2019_GCB_UK.shp")
+
+areas |>
+  dplyr::select(lad19cd, lad19nm) |>
+  head() #It works
+
+areas <- areas |> dplyr::rename( 
+  area_code = "lad19cd", 
+  area_name = "lad19nm" 
+  ) 
+
+product_head <- product_head |> dplyr::rename( 
+  area_code = "LA code", 
+  area_name = "LA name" 
+  )
+
+areas <- areas |>
+  dplyr::left_join(product_head, by = "area_code")
+
+areas$`2023` <- as.numeric(areas$`2023`)
+
+areas_vect <- as(areas, "Spatial")
+
+plot(areas["2023"])
+```
+
+```{r}
+london_area <- areas %>% subset(`ITL1 Region` == 'London')
+london_area <- london_area %>%
+    dplyr::filter(!(area_code %in% c("E09000001", "E09000007"))) #Take out observations with +1M GDP/head : City of London and Camdem
+london_crimes <- my_coords[grepl("^E0100", my_coords$LSOA.code), ]
+mapview(london_area["2023"]) +
+  mapview(london_crimes, col.regions = "red", alpha = 0.2, cex = 0.5)
+```
+
+```{r}
+#A raster is a database organized as a rectangular grid that is sub-divided into rectangular cells of equal area (in terms of the units of the coordinate reference system)
+r_template <- raster(extent(areas_vect))  #we use extent to get the same size as the number of points in the police dataset
+gdphead_raster <- rasterize(
+  areas_vect,          #Our polygones
+  r_template,          #Raster base where they will be put
+  field = "X2023",     #GDP/head in 2023
+  fun = mean,          #Take mean if various polygones are in the same area
+  background = NA      #NA for cases without any value
+)
+
+#Transform ppp into spatial points
+points_sp <- SpatialPoints(cbind(police_clean_ppp$x, police_clean_ppp$y),
+                           proj4string = crs(gdphead_raster))
+
+#Extract GDP/head values for each point
+police_clean_ppp$gdp_hab <- raster::extract(gdphead_raster, points_sp)
+
+#Only keep points where the value of GDP/head is not NA
+police_clean_ppp_filtered <- police_clean_ppp[!is.na(police_clean_ppp$gdp_hab)]
+gdphead_raster[is.na(gdphead_raster)] <- 0 #To double check (give them value 0)
+library(spatstat.geom)
+
+#Convert to im so that we can use it in ppm
+mat <- as.matrix(gdphead_raster)
+ext <- extent(gdphead_raster)
+gdp_hab_im <- im(
+  mat,
+  xcol = seq(ext@xmin, ext@xmax, length.out = ncol(mat)),
+  yrow = seq(ext@ymin, ext@ymax, length.out = nrow(mat))
+) 
+```
+
+Model
+
+```{r}
+ppm_model <- ppm(
+  police_clean_ppp ~ gdp_hab,
+  covariates = list(gdp_hab = gdp_hab_im)
+)
+summary(ppm_model)
+```
+
+## Final regression
+
+```{r}
+ppm_model <- ppm(
+  police_clean_ppp ~ gdp_hab + number_residents,
+  covariates = list(gdp_hab = gdp_hab_im, number_residents = number_residents_im)
+)
+summary(ppm_model)
+```
+
+Interpretation:
+
+-   For each extra unit of GDP/habitant, the intensity of crime is reduced by -2.654507e-04
+
+-   For each time there is an increase of one unit of GDP/habitant, we multiply the intensity of crime by 0.9997 (or reduce it by 3%)
 
 # Conclusion
+
+The three methods to test spatial correlation presented conclude that there is a strong correlation between the crimes and the regions. Crimes do not happen randomly at a given place but they are driven by certain factors. We regressed the crimes on the population and on gdp per capita separetly and we find that there is a clear link between the GDP per capita and the crimes. The higher the GDP per capita the lower the crimes. When regressing the two variables together GDP per capita decreases the number of crimes and the number of habitants increases it. However, the coefficients are small. This indicates that there might be some other cofunders and perhaps the use of IV might be useful.
