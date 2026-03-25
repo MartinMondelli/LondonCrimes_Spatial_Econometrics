@@ -828,4 +828,41 @@ gdphead_raster[is.na(gdphead_raster)] <- 0 #To double check (give them value 0)
 library(spatstat.geom)
 
 #Convert to im so that we can use it in ppm
-mat <- as.m
+mat <- as.matrix(gdphead_raster)
+ext <- extent(gdphead_raster)
+gdp_hab_im <- im(
+  mat,
+  xcol = seq(ext@xmin, ext@xmax, length.out = ncol(mat)),
+  yrow = seq(ext@ymin, ext@ymax, length.out = nrow(mat))
+) 
+```
+
+Model
+
+```{r}
+ppm_model <- ppm(
+  police_clean_ppp ~ gdp_hab,
+  covariates = list(gdp_hab = gdp_hab_im)
+)
+summary(ppm_model)
+```
+
+## Final regression
+
+```{r}
+ppm_model <- ppm(
+  police_clean_ppp ~ gdp_hab + number_residents,
+  covariates = list(gdp_hab = gdp_hab_im, number_residents = number_residents_im)
+)
+summary(ppm_model)
+```
+
+Interpretation:
+
+-   For each extra unit of GDP/habitant, the intensity of crime is reduced by -2.654507e-04
+
+-   For each time there is an increase of one unit of GDP/habitant, we multiply the intensity of crime by 0.9997 (or reduce it by 3%)
+
+# Conclusion
+
+The three methods to test spatial correlation presented conclude that there is a strong correlation between the crimes and the regions. Crimes do not happen randomly at a given place but they are driven by certain factors. We regressed the crimes on the population and on gdp per capita separetly and we find that there is a clear link between the GDP per capita and the crimes. The higher the GDP per capita the lower the crimes. When regressing the two variables together GDP per capita decreases the number of crimes and the number of habitants increases it. However, the coefficients are small. This indicates that there might be some other cofunders and perhaps the use of IV might be useful.
