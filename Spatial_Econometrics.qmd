@@ -77,6 +77,16 @@ police = read.csv(path_data)
 
 ```
 
+# Data base presentation
+
+For this project we used two datasets:
+
+-   For the regressions we used a dataset containing information on the population and GDP among other variables that we did not use in this project (<https://www.ons.gov.uk/economy/grossdomesticproductgdp/datasets/regionalgrossdomesticproductlocalauthorities>)
+
+-   
+
+# I/ Spatial Point Patterns Introduction
+
 Counting number of NAs
 
 ```{r}
@@ -114,10 +124,6 @@ police_clean_ppp <- ppp(
   window = win
 )
 ```
-
-# Data base presentation
-
-# I/ Spatial Point Patterns Introduction
 
 # II/ Complete Spatial Randomness
 
@@ -563,9 +569,9 @@ The weights we can apply in the package spatstat are:
 
 -   The isotropic correction (Ohser 1983, Ripley 1988): $w_{ij} = \frac{\text{Total area of C}}{\text{Are of C in A}}$
 
--The translate correction (Ohser 1983): $$
-w_{ij} = \frac{|A|}{|A \cap (A+(x_i-x_j))|}
-$$ It exist also the possibility to compute $\hat{K}(s)$ without $w_{i,j}$.
+-   The translate correction (Ohser 1983): $$
+    w_{ij} = \frac{|A|}{|A \cap (A+(x_i-x_j))|}
+    $$ It exist also the possibility to compute $\hat{K}(s)$ without $w_{i,j}$.
 
 ```{r}
 K <- Kest(
@@ -583,9 +589,7 @@ A variant of the $\hat{K}(s)$ function is the $\hat{L}(s)$ that is the square ro
 
 $$
 L(s) = \sqrt{\frac{K(s)}{\pi}}
-$$ and \$\$ \hat{L}(s) = \sqrt{\frac{\hat{K}(s)}{\pi}}
-
-\$\$
+$$ and $\hat{L}(s) = \sqrt{\frac{\hat{K}(s)}{\pi}}$
 
 ```{r}
 L <- Lest(police_clean_ppp,
@@ -824,29 +828,4 @@ gdphead_raster[is.na(gdphead_raster)] <- 0 #To double check (give them value 0)
 library(spatstat.geom)
 
 #Convert to im so that we can use it in ppm
-mat <- as.matrix(gdphead_raster)
-ext <- extent(gdphead_raster)
-gdp_hab_im <- im(
-  mat,
-  xcol = seq(ext@xmin, ext@xmax, length.out = ncol(mat)),
-  yrow = seq(ext@ymin, ext@ymax, length.out = nrow(mat))
-) 
-```
-
-Model
-
-```{r}
-ppm_model <- ppm(
-  police_clean_ppp ~ gdp_hab,
-  covariates = list(gdp_hab = gdp_hab_im)
-)
-summary(ppm_model)
-```
-
-Interpretation:
-
--   For each extra unit of GDP/habitant, the intensity of crime is reduced by -2.654507e-04
-
--   For each time there is an increase of one unit of GDP/habitant, we multiply the intensity of crime by 0.9997 (or reduce it by 3%)
-
-# Conclusion
+mat <- as.m
