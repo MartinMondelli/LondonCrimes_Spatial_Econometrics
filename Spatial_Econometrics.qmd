@@ -648,6 +648,8 @@ library(raster)
 library(spatstat.geom)
 library(sp)
 
+path_data = paste(getwd(), "regionalgrossdomesticproductgdplocalauthorities.xlsx", sep = "/")
+
 number_residents <- read_excel(
   path_data,
   sheet = "Table 6",
@@ -683,7 +685,7 @@ plot(areas["2018"])
 London area population/crimes:
 
 ```{r}
-london_area <- areas[areas$`NUTS1 Region` == 'London', ]
+london_area <- areas %>% subset(`ITL1 Region` == 'London')
 london_crimes <- my_coords[grepl("^E0100", my_coords$LSOA.code), ]
 mapview(london_area["2018"]) +
   mapview(london_crimes, col.regions = "red", alpha = 0.2, cex = 0.5)
@@ -763,10 +765,16 @@ product_head <- read_excel(
   skip = 1
 )
 
+areas <- st_read("Shape/Local_Authority_Districts_December_2019_GCB_UK.shp")
+
+areas |>
+  dplyr::select(lad19cd, lad19nm) |>
+  head() #It works
+
 areas <- areas |> dplyr::rename( 
   area_code = "lad19cd", 
   area_name = "lad19nm" 
-  )
+  ) 
 
 product_head <- product_head |> dplyr::rename( 
   area_code = "LA code", 
@@ -776,17 +784,19 @@ product_head <- product_head |> dplyr::rename(
 areas <- areas |>
   dplyr::left_join(product_head, by = "area_code")
 
+areas$`2023` <- as.numeric(areas$`2023`)
+
 areas_vect <- as(areas, "Spatial")
 
-plot(areas["20183"])
+plot(areas["2023"])
 ```
 
 ```{r}
-london_area <- areas[areas$`NUTS1 Region` == 'London', ]
+london_area <- areas %>% subset(`ITL1 Region` == 'London')
 london_area <- london_area %>%
     dplyr::filter(!(area_code %in% c("E09000001", "E09000007"))) #Take out observations with +1M GDP/head : City of London and Camdem
 london_crimes <- my_coords[grepl("^E0100", my_coords$LSOA.code), ]
-mapview(london_area["20183"]) +
+mapview(london_area["2023"]) +
   mapview(london_crimes, col.regions = "red", alpha = 0.2, cex = 0.5)
 ```
 
@@ -796,17 +806,17 @@ r_template <- raster(extent(areas_vect))  #we use extent to get the same size as
 gdphead_raster <- rasterize(
   areas_vect,          #Our polygones
   r_template,          #Raster base where they will be put
-  field = "X20183",     #GDP/head in 2018
+  field = "X2023",     #GDP/head in 2023
   fun = mean,          #Take mean if various polygones are in the same area
   background = NA      #NA for cases without any value
 )
 
 #Transform ppp into spatial points
 points_sp <- SpatialPoints(cbind(police_clean_ppp$x, police_clean_ppp$y),
-                           proj4string = crs(population_raster))
+                           proj4string = crs(gdphead_raster))
 
 #Extract GDP/head values for each point
-police_clean_ppp$gdp_hab <- raster::extract(population_raster, points_sp)
+police_clean_ppp$gdp_hab <- raster::extract(gdphead_raster, points_sp)
 
 #Only keep points where the value of GDP/head is not NA
 police_clean_ppp_filtered <- police_clean_ppp[!is.na(police_clean_ppp$gdp_hab)]
@@ -835,7 +845,7 @@ summary(ppm_model)
 
 Interpretation:
 
--   For each extra unit of GDP/habitant, the intensity of crime is reduced by -2.989723e-04
+-   For each extra unit of GDP/habitant, the intensity of crime is reduced by -2.654507e-04
 
 -   For each time there is an increase of one unit of GDP/habitant, we multiply the intensity of crime by 0.9997 (or reduce it by 3%)
 
