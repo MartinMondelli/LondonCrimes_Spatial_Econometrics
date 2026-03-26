@@ -147,7 +147,7 @@ There are three possible H0 for a Quadrat test :
 
 -   If H0 : «The points are distributed following a CSR or regular pattern in the grid» we reject HO at level $\alpha$ if $X^2>\chi^2_{m-1,1-\alpha}$. In this case, H1 is «The points are distributed following a clustered pattern in the grid»
 
--   If H0 «The points are distributed following a CSR or clustered pattern in the grid» we reject HO at level $\alpha$ if $X^2<\chi^2_{m-1,1-\alpha}$. In this case, H1 is «The points are distributed following a regular pattern in the grid».
+-   If H0 «The points are distributed following a CSR or clustered pattern in the grid» we reject HO at level $\alpha$ if $X^2<\chi^2_{m-1,\alpha}$. In this case, H1 is «The points are distributed following a regular pattern in the grid».
 
 It is important to note that the results of the test is dependent on the definition of the grid, left at the discretion of the statistician. As such, it is important to adapt the grid to the precision wanted and test different configurations to make sure we are not concluding because of statistical artifacts.
 
