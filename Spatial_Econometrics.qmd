@@ -268,7 +268,7 @@ col_matrix <- matrix(cols[col_index], nrow=nrow(Q), ncol=ncol(Q))
 plot(Q, col=col_matrix, main="Quadrat of the crimes in Greater London")
 ```
 
-From this matrix, one can guess that there is obviously a concentration of points that is not random. Let us test the hypothesis same H0's as before, with a 10\*10 grid.
+This matrix shows the number of crimes reported in each square of the grid. The values that are the most extreme are the most bright ones. From this matrix, one can guess that there is obviously a concentration of points that is not random. Let us test the hypothesis same H0's as before, with a 10\*10 grid.
 
 ```{r}
 Q <- quadratcount(X, nx = 10, ny = 10) #Transform ppp into a nx*ny grid. 
@@ -278,7 +278,38 @@ quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a r
 quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
 ```
 
-The results are no surprise : points are clustered, even when looking at Greater London only.
+The results are no surprise : points are clustered, even when looking at Greater London only. To make sure that our results are not dependent on the definition of the grid, let us run the test on different definitions of the grid. The grids defined here are not square, to make sure that we take into account the fact that London is an ovaloid.
+
+```{r}
+Q <- quadratcount(X, nx = 150, ny = 100) #Transform ppp into a nx*ny grid. 
+
+quadrat.test(Q) #p-value < 0.001 ==> there is a pattern of distribution
+quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a regular pattern
+quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
+```
+
+All three tests give us the same results. We do not plot the hotmap as there are too many squares in the grid. What about a much larger specification ?
+
+```{r}
+#Creates a 4*3 grid used in the Quadrat test and displays the amount of crimes reported in each rectangle
+Q <- quadratcount(X, nx=4, ny=3)
+vals <- as.vector(as.matrix(Q))
+cols <- hcl.colors(3, "YlOrRd")
+col_index <- cut(vals, breaks=3, labels=FALSE)
+col_matrix <- matrix(cols[col_index], nrow=nrow(Q), ncol=ncol(Q))
+
+#Plot of Q as a heatmap
+plot(Q, col=col_matrix, main="Quadrat of the crimes in Greater London")
+```
+One can notice that the left and right outer layers contain far less observations than the middle ones
+```{r}
+Q <- quadratcount(X, nx = 4, ny = 3) #Transform ppp into a nx*ny grid.
+
+quadrat.test(Q) #p-value < 0.001 ==> there is a pattern of distribution 
+quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a regular pattern 
+quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
+```
+Same as with the two grids before : the points are most definitely clustered.
 
 # III/ Intensity estimation
 
