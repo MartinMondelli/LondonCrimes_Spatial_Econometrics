@@ -1,28 +1,26 @@
 ---
 title: "Spatial Econometrics"
 subtitle: "Spatial Point Patterns"
-author: "Mondelli Martin, Senseby Dorian,
- Francisco Gonzalez-Garcia, Barcaroli Clement"
+author: "Barcaroli Clement, Gonzalez-Garcia Francisco, Mondelli Martin, Senseby Dorian"
 date: "`r Sys.Date()`"
-
 format:
-  html:
-    html-math-method: katex
-    theme: journal      
+  pdf:
     toc: true
     toc-title: "Table of Contents"
     toc-depth: 3
-    number-sections: false
-    code-fold: show
-    code-summary: "hide code"
-    
-
-
-
+    number-sections: true
+    colorlinks: true
+    pdf-engine: lualatex
+    documentclass: scrartcl   # or "article" / "report" if you prefer
+    classoption: [a4paper, 11pt]
+    geometry: 
+      - margin=1in
+    code-fold: true
+    code-summary: "Show code"
+    highlight-style: tango
 execute:
   warning: false
   message: false
-
 editor:
   visual:
     wrap: 72
@@ -30,21 +28,37 @@ editor:
 
 ```{r setup, include=FALSE}
 
-#Importing data
+#Libraries
+if (!requireNamespace("sf", quietly = TRUE))          install.packages("sf")
+if (!requireNamespace("mapview", quietly = TRUE))     install.packages("mapview")
+if (!requireNamespace("rnaturalearth", quietly = TRUE)) install.packages("rnaturalearth")
+if (!requireNamespace("spatstat", quietly = TRUE))    install.packages("spatstat")
+if (!requireNamespace("leaflet", quietly = TRUE))     install.packages("leaflet")
+if (!requireNamespace("raster", quietly = TRUE))      install.packages("raster")
+if (!requireNamespace("terra", quietly = TRUE))       install.packages("terra")
+if (!requireNamespace("readxl", quietly = TRUE))      install.packages("readxl")
+if (!requireNamespace("knitr", quietly = TRUE))       install.packages("knitr")
+if (!requireNamespace("fields", quietly = TRUE))      install.packages("fields")
+if (!requireNamespace("scales", quietly = TRUE))      install.packages("scales")
 
-
-library("sf")
-library("mapview")
+# Load the libraries
+library(sf)
+library(mapview)
+library(rnaturalearth)
 library(spatstat)
 library(spatstat.geom)
+library(leaflet)
+library(raster)
+library(terra)
+library(readxl)
+library(tidyverse)
+library(fields)
+library(scales)
+library(knitr)
+library(sp)
 ```
 
 ```{r}
-police = read.csv("2025-07-metropolitan-outcomes.csv")
-if (!require(knitr))      install.packages("knitr")
-
-library(knitr)
-
 knitr::opts_chunk$set(
   echo = TRUE,       # afficher le code par défaut
   results = "hold",  # tous les outputs ensemble
@@ -55,33 +69,10 @@ knitr::opts_chunk$set(
 
 ```
 
-Importing data and packages
+Importing main data
 
 ```{r}
-# install les packages necessaires si ils ne sont pas deja installes
-if (!require(sf))      install.packages("sf")
-if (!require(mapview))      install.packages("mapview")
-if (!require(rnaturalearth))      install.packages("rnaturalearth")
-if (!require(spatstat))      install.packages("spatstat")
-if (!require(leaflet))      install.packages("leaflet")
-if (!require(spatstat.geom))      install.packages("spatstat.geom")
-if (!require(raster))      install.packages("raster")
-if (!require(terra))      install.packages("terra")
-
-
-# charge les packages
-require(readxl)
-require("sf")
-require("mapview")
-require(rnaturalearth)
-require(spatstat)
-require(leaflet)
-require(spatstat.geom)
-require(raster)
-require(terra)
-
-
-# chemin adaptatif vers les données 
+# Adaptative path to data
 path_data = paste(getwd(), "2025-07-metropolitan-outcomes.csv", sep = "/")
 
 police = read.csv(path_data)
@@ -94,7 +85,7 @@ For this project we used two datasets:
 
 -   For the regressions we used a dataset containing information on the population and GDP among other variables that we did not use in this project (<https://www.ons.gov.uk/economy/grossdomesticproductgdp/datasets/regionalgrossdomesticproductlocalauthorities>)
 
--   
+-   or testing CSR, we used the July 2025 street-level crime and outcomes data provided by [UK Police]{.underline}, which contains geocoded crime events with latitude and longitude coordinates. <https://data.police.uk/data/archive/2025-07.zip>
 
 # I/ Spatial Point Patterns Introduction
 
@@ -124,7 +115,6 @@ Plot it
 mapview(my_coords) #If it doesn't work try with leaflet
 ```
 
-
 ```{r}
 coords <- st_coordinates(my_coords)
 win <- as.owin(st_bbox(my_coords))
@@ -135,13 +125,11 @@ police_clean_ppp <- ppp(
 )
 ```
 
-
 ## Quadrat test
 
 We want to test whether points are distributed uniformly on our surface of interest or not. To do so, we use the Quadrat test. It consists in drawing a L\*l grid around our space of concern and count the number of points included in each square of our grid. Then, a $X^2 =\Sigma_{i=1}^m\frac{(observed_i-expected)^2}{expected}$ statistic is computed, with $m$ the number of squares composing the grid, $observed_i$ the number of points contained in the rectangle $i$ and $expected = \frac{Total \space number \space of \space points}{L*l}$ the expected number of points in each square of the grid if they were to be distributed uniformly. This $X^2$ statistic converges towards a $\chi^2$. It suffices then to compare $X^2$ to the quantiles of a $\chi^2_{m-1}$ law.
 
 There are three possible H0 for a Quadrat test :
-
 
 -   If H0 : «The points are distributed uniformly in the grid» we reject H0 at level $\alpha$ if $|X^2|>\chi^2_{m-1,1-\frac{\alpha}{2}}$ . In this case, H1 is «The points are not distributed uniformly in the grid».
 
@@ -150,8 +138,6 @@ There are three possible H0 for a Quadrat test :
 -   If H0 «The points are distributed following a CSR or clustered pattern in the grid» we reject HO at level $\alpha$ if $X^2<\chi^2_{m-1,\alpha}$. In this case, H1 is «The points are distributed following a regular pattern in the grid».
 
 It is important to note that the results of the test is dependent on the definition of the grid, left at the discretion of the statistician. As such, it is important to adapt the grid to the precision wanted and test different configurations to make sure we are not concluding because of statistical artifacts.
-
-
 
 ```{r}
 X <- as.ppp(st_coordinates(my_coords), st_bbox(my_coords)) #Turn sf into ppp
@@ -183,7 +169,6 @@ We test H0 respectively:
 
 -   «The points are distributed following a CSR or regular pattern in a 2\*2 grid»
 
-
 ```{r}
 Q <- quadratcount(X, nx = 2, ny = 2) #Transform ppp into a nx*ny grid. As England is elongated, we use an elongated grid
 
@@ -192,9 +177,7 @@ quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a r
 quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
 ```
 
-
 Results remain unchanged. Let us take a much larger 1000\*1200 grid this time.
-
 
 We test H0 respectively:
 
@@ -253,7 +236,6 @@ plot(X,size=0.1,main="Spatial repartition of the crimes in Greater London")
 
 ```
 
-
 This first plot shows that the Greater London area is very heterogeneous. The outskirts are low-density rural town with little to no crime reported. Likewise, the Thames river and the marshes appear clearly by contrast : no crimes are reported on the waters.
 
 ```{r}
@@ -301,7 +283,9 @@ col_matrix <- matrix(cols[col_index], nrow=nrow(Q), ncol=ncol(Q))
 #Plot of Q as a heatmap
 plot(Q, col=col_matrix, main="Quadrat of the crimes in Greater London")
 ```
+
 One can notice that the left and right outer layers contain far less observations than the middle ones
+
 ```{r}
 Q <- quadratcount(X, nx = 4, ny = 3) #Transform ppp into a nx*ny grid.
 
@@ -309,6 +293,7 @@ quadrat.test(Q) #p-value < 0.001 ==> there is a pattern of distribution
 quadrat.test(Q, alternative = "regular") #p-value = 1 ==> cannot conclude on a regular pattern 
 quadrat.test(Q, alternative = "clustered") #p-value < 0.001 ==> clustered points around London
 ```
+
 Same as with the two grids before : the points are most definitely clustered.
 
 # III/ Intensity estimation
@@ -386,7 +371,7 @@ my_coords2 <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 
 
 
 my_coords2 = st_transform(my_coords2, crs = 27700)
-# Coordonnées
+# Coordinates
 coords2 <- st_coordinates(my_coords2)
 
 
@@ -407,7 +392,7 @@ pp <- ppp(
 
 
 par(mfrow = c(1,1),
-    mar = c(1,1,1,1))  # bas, gauche, haut, droite
+    mar = c(1,1,1,1))
 
 
 # Plot
@@ -439,8 +424,8 @@ Sigma = bandwidth, it is in meters so a point has an influence on intensity in a
 
 ```{r}
 par(mfrow = c(2,2),
-    mar = c(1,1,1,1),      # marges internes des graphiques
-    oma = c(0,0,2,0))      # marges externes (haut = 4)
+    mar = c(1,1,1,1),
+    oma = c(0,0,2,0))
 
 plot(density(pp, sigma = 10000),
      main = "Bandwidth = 10000")
@@ -475,9 +460,7 @@ mtext("Intensity estimation with different bandwidths",
 ### Focus on London
 
 ```{r}
-
-library(spatstat.geom)
-# Définir bbox de Londres (EN WGS84 !)
+# Define bbox of London (EN WGS84 !)
 london_bbox <- st_bbox(c(
   xmin = -0.6,
   xmax =  0.3,
@@ -485,23 +468,23 @@ london_bbox <- st_bbox(c(
   ymax = 51.7
 ), crs = 4326)
 
-#  Transformer bbox en 27700
+# Transform bbox in 27700
 london_window <- st_as_sfc(london_bbox)
 london_window <- st_transform(london_window, crs = 27700)
 
-#  Filtrer les points dans Londres
+# Filtrer points in London
 
 my_coords3 = my_coords2 # |> subset(Outcome.type == "Suspect charged")
 
 my_coords_london <- st_intersection(my_coords3, london_window)
 
-#  Coordonnées
+# Coordinates
 coords_london <- st_coordinates(my_coords_london)
 
-# Fenêtre spatiale (IMPORTANT : utiliser london_window, pas bbox brute)
+# Spatial Window (IMPORTANT : use london_window instead of bbox)
 win_london <- as.owin(london_window)
 
-# Créer ppp
+# Generate ppp
 pp_london <- ppp(
   x = coords_london[,1],
   y = coords_london[,2],
@@ -522,10 +505,6 @@ plot(pp_london, add = TRUE, pch = 20,size = 0.1, col = "blue")
 lambdahat <- density(pp_london)
 attr(lambdahat, "sigma")
 ```
-
-
-
-
 
 ```{r, fig.width=10, fig.height=10}
 
@@ -557,15 +536,11 @@ contour(density(pp_london, sigma = 1500), add = TRUE, log = TRUE) # contour plot
 
 We notice a hotspot of crime in center of London
 
-
-
-
-
 ```{r,fig.width=6, fig.height=10}
 
 
 
-#  Données en sf + projection UK
+# Data in sf + projection UK
 my_coords2 <- st_as_sf(police_clean, coords = c("Longitude", "Latitude"), crs = 4326)
 my_coords2 <- st_transform(my_coords2, crs = 27700)
 
@@ -573,7 +548,7 @@ my_coords2 <- st_transform(my_coords2, crs = 27700)
 my_coords3 = my_coords2 # |> subset(Outcome.type == "Suspect charged")
 
 
-#  BBOX Londres (WGS84)
+# BBOX London (WGS84)
 london_bbox <- st_bbox(c(
   xmin = -0.6,
   xmax =  0.3,
@@ -604,7 +579,7 @@ pp_london <- ppp(
 
 
 
-#  Transformation des points et bbox pour leaflet
+# Transformation des points et bbox pour leaflet
 points_wgs84 <- st_transform(my_coords_london, 4326)
 london_window_wgs84 <- st_transform(london_window, 4326)
 
@@ -619,7 +594,7 @@ LSOA_uk <- st_transform(LSOA_uk, 4326)
 
 # london_window_wgs84 = Window polygone
 
-# 1 found LSOA that touch london_window_wgs84
+# Found LSOA that touch london_window_wgs84
 
 index <- st_intersects(LSOA_uk, london_window_wgs84)
 
@@ -631,11 +606,11 @@ LSOA_in_window <- LSOA_uk[lengths(index) > 0, ]
 london_full =st_union(LSOA_in_window) 
 
 
-# Fenêtre cohérente
+# Coherent Window
 london_full_win <- as.owin(st_transform(london_full, 27700))
 
 
-# Objet ppp
+# ppp object
 pp_london <- ppp(
   x = coords_london[,1],
   y = coords_london[,2],
@@ -644,12 +619,10 @@ pp_london <- ppp(
 
 
 
-#  Densité kernel
+#  Kernel density
 dens <- density(pp_london, sigma = 3000)
 
-#  Conversion en raster
-
-library(terra)
+#  Transform to raster
 
 r <- rast(dens)
 crs(r) <- "EPSG:27700"
@@ -658,7 +631,7 @@ crs(r) <- "EPSG:27700"
 r_wgs84 <- project(r, "EPSG:4326")
 
 
-# Palette de couleurs
+# Colors
 pal <- colorNumeric("viridis", dens$v, na.color = "transparent")
 
 #  Leaflet map
@@ -691,25 +664,15 @@ leaflet() %>%
 
 ```
 
-
-
 ### Import of population table (variable aggregated at LSOA level)
- 
 
- 
 LSOA = geographic unit used by ONS (organism national statistics) of UK
 
 source: [United kingdom government: population estimate by LSOA](https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates)
 
-
-
 LSOA table : <https://geoportal.statistics.gov.uk/datasets/0f80c523f3cd4d0fab5111572f84a2fb_0/explore>
 
-
-
 Plot of all geographic unit
-
-
 
 ```{r}
 
@@ -718,11 +681,11 @@ Plot of all geographic unit
 leaflet(LSOA_in_window) %>%
   addTiles() %>%
   addPolygons(
-    weight = 0.5,       # épaisseur du trait
-    color = "blue",     # couleur du contour
-    fill = FALSE,        # pas de remplissage si tu veux juste les contours
+    weight = 0.5,
+    color = "blue",
+    fill = FALSE,
     opacity = 1  
-    ) |> # Contour Londres
+    ) |>
   addPolygons(
   data = london_full,
   fill = FALSE,
@@ -734,9 +697,6 @@ leaflet(LSOA_in_window) %>%
 
 ```
 
-
-
-
 ```{r}
 
 population <- read_excel("population.xlsx", 
@@ -744,9 +704,6 @@ population <- read_excel("population.xlsx",
 population = population[,1:5]
 
 ```
-
-
-
 
 ```{r}
 
@@ -759,42 +716,42 @@ pop_london = LSOA_in_window |> left_join(population, by = c("LSOA01CD" = "LSOA 2
 sum(is.na(pop_london$Total))
 
 ```
-We remplace NA by mean for 3 nearest regions
 
+We remplace NA by mean for 3 nearest regions
 
 ```{r}
 
 
-# Assurons-nous que pop_london est un sf
+# Check pop_london is sf
 pop_london_sf <- st_as_sf(pop_london)
 
-# Vérifier NA
+# Check for NAs
 sum(is.na(pop_london_sf$Total))
 
-# Séparer les NA et les non-NA
+# Separate NA and non-NA
 na_rows <- pop_london_sf %>% filter(is.na(Total))
 non_na_rows <- pop_london_sf %>% filter(!is.na(Total))
 
-# Boucle sur chaque NA pour remplacer par moyenne des 3 voisins les plus proches
+# Loop to replace NAs by the mean of the three closest neighbors
 for(i in seq_len(nrow(na_rows))) {
   
-  # Centroid de l'objet courant (pour distance)
+  # Centroid of object
   centroid_i <- st_centroid(na_rows[i, "SHAPE"])
   
-  # Calculer distances aux objets non-NA
+  # Compute distance to non-NA objects
   dists <- st_distance(centroid_i, st_centroid(non_na_rows$SHAPE))
   
-  # Trier et prendre les 3 plus proches
+  # Sort and take 3-NN closest
   nearest_idx <- order(dists)[1:3]
   
-  # Moyenne des voisins
+  # Mean neighbors
   na_rows$Total[i] <- mean(non_na_rows$Total[nearest_idx], na.rm = TRUE)
 }
 
-# Combiner avec le reste
+# bind rows
 pop_london_imputed <- bind_rows(non_na_rows, na_rows)
 
-# Vérifier qu'il n'y a plus de NA
+# Check no more NAs
 sum(is.na(pop_london_imputed$Total))
 
 
@@ -802,16 +759,9 @@ sum(is.na(pop_london_imputed$Total))
 
 We transform pop_london_sf in a point patern weighted population by taking centroid of each region
 
-
-
 ```{r}
-
-
-# Calcul des centroïdes
+# Compute centroids
 pop_london_points <- st_centroid(pop_london_imputed)
-
-
-library(scales)
 
 radius <- rescale(sqrt(pop_london_points$Total), to = c(1, 6))
 
@@ -826,26 +776,23 @@ leaflet(pop_london_points) %>%
   )
 ```
 
-
-
-
 Plot of intensity population in London
 
 ```{r, fig.height=10, fig.width=10}
 
-# Reprojection AVANT centroid
+# Reprojection before centroid
 pop_london_proj <- st_transform(pop_london_imputed, 27700)
 
-# Centroïdes dans le bon système
+# Centroids in the right system
 pop_london_points <- st_centroid(pop_london_proj)
 
-# Coordonnées cohérentes
+# Coherent coordinates
 coords <- st_coordinates(pop_london_points)
 
-# Fenêtre cohérente
+# Coherent window
 win <- as.owin(st_union(pop_london_proj))
 
-# 4. Point pattern pondéré
+# Weighted point pattern
 pop_point_pattern <- ppp(
   x = coords[,1],
   y = coords[,2],
@@ -853,41 +800,35 @@ pop_point_pattern <- ppp(
   marks = pop_london_points$Total
 )
 
-# 5. Estimation de densité kernel pondérée
+# Weighted estimation of the Kernel
 dens <- density(
   pop_point_pattern,
   weights = pop_point_pattern$marks,
   sigma = bw.diggle(pop_point_pattern)
 )
-# 6. Plot
+# Plot
 plot(dens, main = "Intensity population (kernel)")
 contour(dens, add = TRUE)
 
 ```
 
-
-
-
-
-
-
 ```{r}
 
 
-#  Transformation des points et bbox pour leaflet
+# Tranform into bbox for leaflet
 points_wgs84 <- st_transform(my_coords_london, 4326)
 london_window_wgs84 <- st_transform(london_window, 4326)
 
 
-# Convertir la densité (spatstat im) en raster
+# Convert to raster
 dens_raster <- rast(dens)
 
 crs(dens_raster) <- "EPSG:27700"
 
-# Projection en WGS84 pour leaflet
+# Projection in WGS84 for leaflet
 # Projection
 r_wgs84 <- project(dens_raster, "EPSG:4326")
-# Palette de couleurs
+# Colors
 pal <- colorNumeric("viridis", values(r_wgs84), na.color = "transparent")
 
 # Plot leaflet
@@ -902,18 +843,13 @@ leaflet() %>%
 
 ```
 
-
 ### Intensity ratio
-
-
-
 
 Intensity Ratio and Spatial Relative Risk
 
 We consider two spatial point patterns observed over the same region: a set of cases (for example, individuals affected by a disease) and a set of controls representing the population at risk. The objective is to compare these two patterns in order to identify spatial variations in risk and detect potential high-risk areas.
 
-We assume that the cases arise from a Poisson process with intensity $\lambda(x)$, while the controls arise from an independent Poisson process with intensity $\lambda_0(x)$. The relationship between these two intensities can be expressed as:
-$$
+We assume that the cases arise from a Poisson process with intensity $\lambda(x)$, while the controls arise from an independent Poisson process with intensity $\lambda_0(x)$. The relationship between these two intensities can be expressed as: $$
 \lambda(x) = \alpha \, \lambda_0(x) \, \rho(x)
 $$
 
@@ -937,7 +873,6 @@ where $K_\sigma$ is a kernel function (typically Gaussian) and $\sigma$ is the b
 
 The spatial relative risk is then estimated by taking the ratio of these smoothed intensities:
 
-
 $$
 \hat{\rho}(x) = \frac{\hat{\lambda}(x)}{\hat{\alpha} \, \hat{\lambda}_0(x)}
 $$
@@ -946,44 +881,30 @@ This estimator provides a continuous surface describing how the risk varies acro
 
 An important practical issue is the choice of the bandwidth. To ensure a fair comparison between the two intensity estimates, it is recommended to use a common bandwidth for both datasets. A simple and commonly used approach consists in taking the average of the optimal bandwidths computed separately for cases and controls:
 
-
 $$
 bw = \frac{bw_{\text{cases}} + bw_{\text{controls}}}{2}
 $$
-
 
 The interpretation of the relative risk surface is straightforward. When $\hat{\rho}(x) > 1$, the location $x$ corresponds to an area where the risk is higher than average, often referred to as a hotspot. When $\hat{\rho}(x) < 1$, the risk is lower than average. Values close to 1 indicate no significant deviation from the baseline risk.
 
 Finally, the estimated relative risk surface is typically visualized as a map, which allows for an intuitive identification of spatial patterns. This approach is widely used in spatial epidemiology, although it remains sensitive to the choice of bandwidth and relies on the assumption of Poisson processes.
 
-
-
-
-
-
-
-
-
 Crime VS population
 
-
 ```{r}
-
-
-
 # crimes = ppp_crimes
 # population = pop_point_pattern (avec marks = Total)
 
-# 1. Créer ppp population non marqué (juste positions)
+# 1. Generate ppp population not marker (only positions)
 pop_ppp <- unmark(pop_point_pattern)
 
-# 2. Bande passante commune
+# 2. Common pass-through band
 #bw_crime <- attr(density(pp_london), "sigma")
 bw_crime = 1000
 bw_pop <- attr(density(pop_ppp), "sigma")
 bw <- (bw_crime + bw_pop) / 2
 
-# 3. Densités
+# 3. Densities
 int_crime <- density(pp_london, sigma = bw)
 int_pop <- density(pop_ppp, sigma = bw, weights = pop_point_pattern$marks)
 
@@ -993,8 +914,6 @@ alpha <- pp_london$n / sum(pop_point_pattern$marks)
 # 5. Ratio
 rr <- t(int_crime$v) / t(alpha * int_pop$v)
 
-library(fields)
-
 # 6. Plot
 image.plot(int_crime$xcol, int_crime$yrow, rr, asp = 1,
            main = "Relative Risk (Crimes charged vs Population)")
@@ -1002,10 +921,7 @@ image.plot(int_crime$xcol, int_crime$yrow, rr, asp = 1,
 
 ```
 
-
 In conclusion, even after controlling for the population at risk, the analysis shows that the center of London exhibits a substantially higher relative risk, indicating that individuals in this area are much more likely to be affected.
-
-
 
 # IV/ The k-function
 
@@ -1059,7 +975,7 @@ plot(K)
 
 The function K is giving us the mean of all possible circles of size r for each r between 0 and 25 km. We clearly see that we are above the benchmark of the theoretical K (when we apply CSR) whatoever the weights, then we can conclude that points are clearly clustered.
 
-##The L-function
+### The L-function
 
 A variant of the $\hat{K}(s)$ function is the $\hat{L}(s)$ that is the square root of the first one divided by square root of $\pi$. This variant allows to interpret better the measure of the K-function and gives us better visualizations.
 
@@ -1076,7 +992,7 @@ plot(L)
 
 We have the same interpretations for the L-function.
 
-##The K-function and Monte Carlo
+### The K-function and Monte Carlo
 
 It is also possible to test for CSR using the K function and a Monte Carlo approximation:
 
@@ -1092,18 +1008,44 @@ E <- envelope(police_clean_ppp, Kest, nsim = 99)
 plot(E)
 ```
 
-##Conclusion Clearly the pattern is not random as the poisson distribution is clearly lower than the empirical K. The estimators (with the different corrections) are quite high meaning that the point pattern is clearly not random. For small radius we observe that the clustering is already important but it clearly explodes after 5 km.
+### Conclusion for K-function
+
+Clearly the pattern is not random as the poisson distribution is clearly lower than the empirical K. The estimators (with the different corrections) are quite high meaning that the point pattern is clearly not random. For small radius we observe that the clustering is already important but it clearly explodes after 5 km.
 
 Remark: one limitation, as we could see on the map above is that the points are quite centered in London and surroundings meaning that our estimation is driven mainly by this area.
 
 # V/ Regression
+
+### The Model We Are Using
+
+We want to understand where and why police incidents occur across different cities in the UK. Instead of assuming that incidents happen completely at random, we model their spatial distribution as a function of local characteristics: population and GDP/Habitant.
+
+#### Model Specification
+
+We use an Inhomogeneous Poisson Point Process Model. This is a model that allows the intensity of events (police incidents) to vary across space depending on covariates such as the number of residents.
+
+The expected intensity of incidents at any location $u$ is given by:
+
+$$
+\lambda(u) = \exp(\beta_0 + \beta \cdot X(u))
+$$
+
+where: $\lambda(u)$ is the intensity (expected number of incidents per unit area) at location $u$, $X(u)$ is a characteristic in the area containing location $u$ (like population or GDP/Habitant), $\beta_0$ is the intercept, $\beta$ measures the effect of population on the intensity of incidents.
+
+A positive $\beta$ would indicate that areas with more of a certain characteristic (more residents or higher GDP/Habitant) tend to have a higher intensity of police incidents, while a negative value suggests the opposite.
+
+#### Key Assumptions
+
+-   The points are generated by an inhomogeneous Poisson process.
+-   Conditional on the covariates, the occurrence of events at different locations is independent.
+
+### Application 
 
 We will do regression using the dataset from this website: <https://www.ons.gov.uk/economy/grossdomesticproductgdp/datasets/regionalgrossdomesticproductlocalauthorities?utm_source=chatgpt.com> It contains diverse indicators on areas in the United Kingdom, it was published in December 2019.
 
 First we need to import the shapes of the districts in the UK
 
 ```{r}
-library(sf)
 areas <- st_read("Shape/Local_Authority_Districts_December_2019_GCB_UK.shp")
 ```
 
@@ -1122,12 +1064,6 @@ We will use two variables:
 ## For resident population numbers
 
 ```{r}
-if (!require(readxl))      install.packages("readxl")
-library("readxl")
-library(raster)
-library(spatstat.geom)
-library(sp)
-
 path_data = paste(getwd(), "regionalgrossdomesticproductgdplocalauthorities.xlsx", sep = "/")
 
 number_residents <- read_excel(
@@ -1196,7 +1132,6 @@ police_clean_ppp$number_residents <- raster::extract(population_raster, points_s
 #Only keep points where the value of population is not NA
 police_clean_ppp_filtered <- police_clean_ppp[!is.na(police_clean_ppp$number_residents)]
 population_raster[is.na(population_raster)] <- 0 #To double check (give them value 0)
-library(spatstat.geom)
 
 #Convert to im so that we can use it in ppm
 mat <- as.matrix(population_raster)
@@ -1218,6 +1153,8 @@ ppm_model <- ppm(
 summary(ppm_model)
 ```
 
+Model 1:
+
 Notes:
 
 -   Edge correction "border"
@@ -1232,7 +1169,9 @@ Notes:
 
 -   Intercept: -14.41 in logs (base log-intensity)
 
--   When we increase by one unit the population, the log intensity deacreases by -9.91e-05 or alternatively, when we increase by 1 unit population, intensity is multiplied by 0.9999.
+-   When we increase by one unit the population, the log intensity deacreases by -5.118290e-05.
+
+    or alternatively, when we increase by 1 unit population, intensity is multiplied by 0.9999.
 
 What is probably happening is that the number of inhabitants in a region might not explain by itself the number of crimes, it is probably a problem of IV.
 
@@ -1301,7 +1240,6 @@ police_clean_ppp$gdp_hab <- raster::extract(gdphead_raster, points_sp)
 #Only keep points where the value of GDP/head is not NA
 police_clean_ppp_filtered <- police_clean_ppp[!is.na(police_clean_ppp$gdp_hab)]
 gdphead_raster[is.na(gdphead_raster)] <- 0 #To double check (give them value 0)
-library(spatstat.geom)
 
 #Convert to im so that we can use it in ppm
 mat <- as.matrix(gdphead_raster)
@@ -1313,8 +1251,6 @@ gdp_hab_im <- im(
 ) 
 ```
 
-Model
-
 ```{r}
 ppm_model <- ppm(
   police_clean_ppp ~ gdp_hab,
@@ -1322,6 +1258,14 @@ ppm_model <- ppm(
 )
 summary(ppm_model)
 ```
+
+Model 2:
+
+-   Intercept: -14.41 in logs (base log-intensity)
+
+-   When we increase by one unit the GDP/capita, the log intensity deacreases by -2.654507e-04
+
+    or alternatively, when we increase by 1 unit population, intensity is multiplied by 0.9997.
 
 ## Final regression
 
@@ -1333,19 +1277,20 @@ ppm_model <- ppm(
 summary(ppm_model)
 ```
 
-Interpretation:
+Model 3:
 
 -   For each extra unit of GDP/habitant, the intensity of crime is reduced by -2.654507e-04
 
--   For each time there is an increase of one unit of GDP/habitant, we multiply the intensity of crime by 0.9997 (or reduce it by 3%)
+-   For each time there is an increase of one unit of GDP/habitant, we multiply the intensity of crime by 0.9995 (or reduce it by 5%)
+
+-   For the population, when increasing by one unit the number of residents, the intensity of crime is increased by 2.561542e-05.
+
+-   For each time there is an increase of one unit of population, we multiply the intensity of crime by 1.00002 (really close to 1).
+
+-   Overall, even if the two coefficients are significatives, the estimate for population is quite small. There is however a clear impact of GDP/capita on the intensity of crime.
+
+-   The fact that we saw a change in the sign of the population estimate when going from model 1 to model 3 indicates that there might be a problem of endogeneity that should be studied with IV for example.
 
 # Conclusion
 
 The three methods to test spatial correlation presented conclude that there is a strong correlation between the crimes and the regions. Crimes do not happen randomly at a given place but they are driven by certain factors. We regressed the crimes on the population and on gdp per capita separetly and we find that there is a clear link between the GDP per capita and the crimes. The higher the GDP per capita the lower the crimes. When regressing the two variables together GDP per capita decreases the number of crimes and the number of habitants increases it. However, the coefficients are small. This indicates that there might be some other cofunders and perhaps the use of IV might be useful.
-
-
-#A replacer
-
-par(mfrow = c(1,1),
-    mar = c(1,1,1,1))  # bas, gauche, haut, droite
-
