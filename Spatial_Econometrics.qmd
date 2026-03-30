@@ -1261,4 +1261,36 @@ summary(ppm_model)
 
 Model 2:
 
--   Intercept: -14.41 in logs (b
+-   Intercept: -14.41 in logs (base log-intensity)
+
+-   When we increase by one unit the GDP/capita, the log intensity deacreases by -2.654507e-04
+
+    or alternatively, when we increase by 1 unit population, intensity is multiplied by 0.9997.
+
+## Final regression
+
+```{r}
+ppm_model <- ppm(
+  police_clean_ppp ~ gdp_hab + number_residents,
+  covariates = list(gdp_hab = gdp_hab_im, number_residents = number_residents_im)
+)
+summary(ppm_model)
+```
+
+Model 3:
+
+-   For each extra unit of GDP/habitant, the intensity of crime is reduced by -2.654507e-04
+
+-   For each time there is an increase of one unit of GDP/habitant, we multiply the intensity of crime by 0.9995 (or reduce it by 5%)
+
+-   For the population, when increasing by one unit the number of residents, the intensity of crime is increased by 2.561542e-05.
+
+-   For each time there is an increase of one unit of population, we multiply the intensity of crime by 1.00002 (really close to 1).
+
+-   Overall, even if the two coefficients are significatives, the estimate for population is quite small. There is however a clear impact of GDP/capita on the intensity of crime.
+
+-   The fact that we saw a change in the sign of the population estimate when going from model 1 to model 3 indicates that there might be a problem of endogeneity that should be studied with IV for example.
+
+# Conclusion
+
+The three methods to test spatial correlation presented conclude that there is a strong correlation between the crimes and the regions. Crimes do not happen randomly at a given place but they are driven by certain factors. We regressed the crimes on the population and on gdp per capita separetly and we find that there is a clear link between the GDP per capita and the crimes. The higher the GDP per capita the lower the crimes. When regressing the two variables together GDP per capita decreases the number of crimes and the number of habitants increases it. However, the coefficients are small. This indicates that there might be some other cofunders and perhaps the use of IV might be useful.
